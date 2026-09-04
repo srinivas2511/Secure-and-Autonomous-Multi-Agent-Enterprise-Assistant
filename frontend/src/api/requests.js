@@ -9,3 +9,8 @@ export async function listRequests() {
   const { data } = await client.get("/api/requests");
   return data;
 }
+
+export async function getRequest(id) {
+  const { data } = await client.get(`/api/requests/${id}`);
+  return data;
+}

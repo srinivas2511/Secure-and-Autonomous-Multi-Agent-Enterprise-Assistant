@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { Link } from "react-router-dom";
+import { Link, useNavigate } from "react-router-dom";
 import { createRequest, listRequests } from "../api/requests";
 import { useAuth } from "../context/AuthContext";
 import { humanizeAgent, humanizeStatus } from "../utils/labels";
@@ -13,6 +13,7 @@ function confidenceTier(confidence) {
 
 export default function RequestsPage() {
   const { user, logout } = useAuth();
+  const navigate = useNavigate();
   const [requests, setRequests] = useState([]);
   const [text, setText] = useState("");
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -54,6 +55,12 @@ export default function RequestsPage() {
         </div>
       </header>
 
+      {user?.role === "hr" && (
+        <p className="subtask-explanation" style={{ margin: "0.75rem 0", padding: "0.6rem 1rem", borderLeft: "3px solid #7c5cbf" }}>
+          HR access — you can use: Knowledge Base, Task Automation, Validation Review, Security Check, Analytics.
+        </p>
+      )}
+
       <form onSubmit={handleSubmit} className="request-form">
         <textarea
           value={text}
@@ -75,6 +82,13 @@ export default function RequestsPage() {
             <span className="request-time">
               {new Date(r.created_at).toLocaleString()}
             </span>
+            <button
+              type="button"
+              onClick={() => navigate(`/requests/${r.id}`)}
+              style={{ marginLeft: "0.75rem", fontSize: "0.8rem", padding: "2px 8px" }}
+            >
+              View detail
+            </button>
             {r.subtasks?.length > 0 && (
               <ul className="subtask-list">
                 {r.subtasks.map((s) => (

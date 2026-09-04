@@ -1,0 +1,120 @@
+import { useEffect, useState } from "react";
+import { Link, useParams } from "react-router-dom";
+import { getRequest } from "../api/requests";
+import { humanizeAgent, humanizeStatus } from "../utils/labels";
+
+function confidenceTier(confidence) {
+  if (confidence == null) return null;
+  if (confidence < 0.4) return "low";
+  if (confidence < 0.7) return "medium";
+  return "high";
+}
+
+export default function RequestDetailPage() {
+  const { id } = useParams();
+  const [request, setRequest] = useState(null);
+  const [error, setError] = useState("");
+
+  useEffect(() => {
+    getRequest(id)
+      .then(setRequest)
+      .catch(() => setError("Could not load request."));
+  }, [id]);
+
+  if (error) {
+    return (
+      <div className="requests-page">
+        <header>
+          <h1>Request Detail</h1>
+          <Link to="/requests">← Back</Link>
+        </header>
+        <p className="error">{error}</p>
+      </div>
+    );
+  }
+
+  if (!request) {
+    return (
+      <div className="requests-page">
+        <header>
+          <h1>Request Detail</h1>
+          <Link to="/requests">← Back</Link>
+        </header>
+        <p>Loading…</p>
+      </div>
+    );
+  }
+
+  return (
+    <div className="requests-page">
+      <header>
+        <h1>Request #{request.id}</h1>
+        <Link to="/requests">← Back to requests</Link>
+      </header>
+
+      <section className="admin-section">
+        <table className="admin-table">
+          <tbody>
+            <tr>
+              <td><strong>Request</strong></td>
+              <td>{request.text}</td>
+            </tr>
+            <tr>
+              <td><strong>Status</strong></td>
+              <td>
+                <span className={`status status-${request.status}`}>
+                  {humanizeStatus(request.status)}
+                </span>
+              </td>
+            </tr>
+            <tr>
+              <td><strong>Submitted</strong></td>
+              <td>{new Date(request.created_at).toLocaleString()}</td>
+            </tr>
+            {request.completed_at && (
+              <tr>
+                <td><strong>Completed</strong></td>
+                <td>{new Date(request.completed_at).toLocaleString()}</td>
+              </tr>
+            )}
+          </tbody>
+        </table>
+      </section>
+
+      {request.subtasks?.length > 0 && (
+        <section className="admin-section">
+          <h2>Subtasks</h2>
+          {request.subtasks.map((s) => (
+            <div key={s.id} style={{ marginBottom: "1.5rem", borderLeft: "3px solid #444", paddingLeft: "1rem" }}>
+              <div style={{ display: "flex", gap: "0.75rem", alignItems: "center", marginBottom: "0.4rem" }}>
+                <strong>{humanizeAgent(s.agent_type)}</strong>
+                <span className={`status status-${s.status}`}>{humanizeStatus(s.status)}</span>
+                {s.confidence != null && (
+                  <span className={`confidence confidence-${confidenceTier(s.confidence)}`}>
+                    {Math.round(s.confidence * 100)}% confidence
+                  </span>
+                )}
+                {s.duration_ms != null && (
+                  <span className="request-time">{(s.duration_ms / 1000).toFixed(1)}s</span>
+                )}
+              </div>
+              {s.description && (
+                <p className="subtask-explanation">Task: {s.description}</p>
+              )}
+              {s.result && <p className="subtask-result">{s.result}</p>}
+              {s.explanation && (
+                <p className="subtask-explanation">Why: {s.explanation}</p>
+              )}
+              {s.approved_by_email && (
+                <p className="subtask-explanation">
+                  Reviewed by {s.approved_by_email} at{" "}
+                  {new Date(s.approved_at).toLocaleString()}
+                </p>
+              )}
+            </div>
+          ))}
+        </section>
+      )}
+    </div>
+  );
+}

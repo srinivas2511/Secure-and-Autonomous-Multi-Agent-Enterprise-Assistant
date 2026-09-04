@@ -190,7 +190,7 @@ function RagEvaluationSection() {
   );
 }
 
-function UsersSection({ currentUserId }) {
+function UsersSection({ currentUserId, roles }) {
   const [users, setUsers] = useState([]);
   const [error, setError] = useState("");
 
@@ -240,9 +240,9 @@ function UsersSection({ currentUserId }) {
                   disabled={u.id === currentUserId}
                   onChange={(e) => handleRoleChange(u, e.target.value)}
                 >
-                  <option value="employee">employee</option>
-                  <option value="hr">hr</option>
-                  <option value="admin">admin</option>
+                  {roles.map((r) => (
+                    <option key={r} value={r}>{r}</option>
+                  ))}
                 </select>
               </td>
               <td>
@@ -539,6 +539,13 @@ function TraceSection({ requestedSubtaskId, requestNonce }) {
 export default function AdminPage() {
   const { user } = useAuth();
   const [traceRequest, setTraceRequest] = useState({ subtaskId: null, nonce: 0 });
+  const [roles, setRoles] = useState(["employee", "hr", "admin"]);
+
+  useEffect(() => {
+    getPermissionsMatrix()
+      .then((data) => setRoles(data.roles))
+      .catch(() => {});
+  }, []);
 
   if (user && user.role !== "admin") {
     return <Navigate to="/requests" replace />;
@@ -555,7 +562,7 @@ export default function AdminPage() {
       </header>
       {user && (
         <>
-          <UsersSection currentUserId={user.id} />
+          <UsersSection currentUserId={user.id} roles={roles} />
           <PermissionsSection />
           <AuditLogSection onTrace={handleTrace} />
           <TraceSection
