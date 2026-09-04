@@ -167,10 +167,17 @@ textarea {
 
 .requests-page {
   text-align: left;
-  padding: 24px;
+  padding: 0;
+  max-width: 100%;
+  margin: 0;
+  width: 100%;
+  box-sizing: border-box;
+}
+
+.page-content {
   max-width: 720px;
   margin: 0 auto;
-  width: 100%;
+  padding: 24px;
   box-sizing: border-box;
 }
 
@@ -439,3 +446,64 @@ textarea {
 .trace-lookup input {
   flex: 1;
 }
+
+/* Shared navigation bar */
+.navbar {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  padding: 10px 24px;
+  border-bottom: 1px solid var(--border);
+  background: var(--bg);
+  position: sticky;
+  top: 0;
+  z-index: 10;
+}
+
+.navbar-brand {
+  font-weight: 600;
+  font-size: 15px;
+  color: var(--text-h);
+  white-space: nowrap;
+}
+
+.navbar-links {
+  display: flex;
+  gap: 4px;
+  flex: 1;
+}
+
+.navbar-links a {
+  font-size: 14px;
+  padding: 4px 10px;
+  border-radius: 6px;
+  color: var(--text);
+  text-decoration: none;
+  transition: background 0.15s;
+}
+
+.navbar-links a:hover {
+  background: var(--accent-bg);
+  color: var(--text-h);
+}
+
+.navbar-links a.active {
+  background: var(--accent-bg);
+  color: var(--accent);
+  font-weight: 500;
+}
+
+.navbar-user {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  font-size: 14px;
+  color: var(--text);
+  white-space: nowrap;
+}
+
+.navbar-user button {
+  padding: 4px 12px;
+  font-size: 14px;
+}
+

@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
 import { Navigate } from "react-router-dom";
+import NavBar from "../components/NavBar";
 import {
   getDecisionTrace,
   getLatestRagEvaluation,
@@ -557,22 +558,22 @@ export default function AdminPage() {
 
   return (
     <div className="requests-page">
-      <header>
-        <h1>Admin</h1>
-      </header>
-      {user && (
-        <>
-          <UsersSection currentUserId={user.id} roles={roles} />
-          <PermissionsSection />
-          <AuditLogSection onTrace={handleTrace} />
-          <TraceSection
-            requestedSubtaskId={traceRequest.subtaskId}
-            requestNonce={traceRequest.nonce}
-          />
-          <MetricsSection />
-          <RagEvaluationSection />
-        </>
-      )}
+      <NavBar />
+      <div className="page-content">
+        {user && (
+          <>
+            <UsersSection currentUserId={user.id} roles={roles} />
+            <PermissionsSection />
+            <AuditLogSection onTrace={handleTrace} />
+            <TraceSection
+              requestedSubtaskId={traceRequest.subtaskId}
+              requestNonce={traceRequest.nonce}
+            />
+            <MetricsSection />
+            <RagEvaluationSection />
+          </>
+        )}
+      </div>
     </div>
   );
 }

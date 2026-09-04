@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 import { Navigate } from "react-router-dom";
 import { approveSubtask, listPendingApprovals, rejectSubtask } from "../api/approvals";
 import { useAuth } from "../context/AuthContext";
+import NavBar from "../components/NavBar";
 import { humanizeAgent } from "../utils/labels";
 
 export default function ApprovalsPage() {
@@ -47,9 +48,9 @@ export default function ApprovalsPage() {
 
   return (
     <div className="requests-page">
-      <header>
-        <h1>Pending Approvals</h1>
-      </header>
+      <NavBar />
+      <div className="page-content">
+      <h2>Pending Approvals</h2>
       {error && <p className="error">{error}</p>}
 
       <ul className="request-list">
@@ -76,6 +77,7 @@ export default function ApprovalsPage() {
         ))}
         {pending.length === 0 && <li className="empty">No pending approvals.</li>}
       </ul>
+      </div>
     </div>
   );
 }

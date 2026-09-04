@@ -1,7 +1,8 @@
 import { useEffect, useState } from "react";
-import { Link, useNavigate } from "react-router-dom";
+import { useNavigate } from "react-router-dom";
 import { createRequest, listRequests } from "../api/requests";
 import { useAuth } from "../context/AuthContext";
+import NavBar from "../components/NavBar";
 import { humanizeAgent, humanizeStatus } from "../utils/labels";
 
 function confidenceTier(confidence) {
@@ -12,7 +13,7 @@ function confidenceTier(confidence) {
 }
 
 export default function RequestsPage() {
-  const { user, logout } = useAuth();
+  const { user } = useAuth();
   const navigate = useNavigate();
   const [requests, setRequests] = useState([]);
   const [text, setText] = useState("");
@@ -41,84 +42,73 @@ export default function RequestsPage() {
 
   return (
     <div className="requests-page">
-      <header>
-        <h1>Enterprise Assistant</h1>
-        <div>
-          <span>
-            {user?.full_name} <span className="user-role">({user?.role})</span>
-          </span>
-          {user?.role === "admin" && <Link to="/approvals">Approvals</Link>}
-          {user?.role === "admin" && <Link to="/admin">Admin</Link>}
-          <button type="button" onClick={logout}>
-            Log out
+      <NavBar />
+      <div className="page-content">
+        {user?.role === "hr" && (
+          <p className="subtask-explanation" style={{ marginBottom: "1rem", padding: "0.6rem 1rem", borderLeft: "3px solid #7c5cbf" }}>
+            HR access — you can use: Knowledge Base, Task Automation, Validation Review, Security Check, Analytics.
+          </p>
+        )}
+
+        <form onSubmit={handleSubmit} className="request-form">
+          <textarea
+            value={text}
+            onChange={(e) => setText(e.target.value)}
+            placeholder="Ask the assistant something, e.g. 'Generate this month's headcount report for Engineering.'"
+            rows={3}
+          />
+          <button type="submit" disabled={isSubmitting}>
+            {isSubmitting ? "Submitting..." : "Submit request"}
           </button>
-        </div>
-      </header>
+        </form>
+        {error && <p className="error">{error}</p>}
 
-      {user?.role === "hr" && (
-        <p className="subtask-explanation" style={{ margin: "0.75rem 0", padding: "0.6rem 1rem", borderLeft: "3px solid #7c5cbf" }}>
-          HR access — you can use: Knowledge Base, Task Automation, Validation Review, Security Check, Analytics.
-        </p>
-      )}
-
-      <form onSubmit={handleSubmit} className="request-form">
-        <textarea
-          value={text}
-          onChange={(e) => setText(e.target.value)}
-          placeholder="Ask the assistant something, e.g. 'Generate this month's headcount report for Engineering.'"
-          rows={3}
-        />
-        <button type="submit" disabled={isSubmitting}>
-          {isSubmitting ? "Submitting..." : "Submit request"}
-        </button>
-      </form>
-      {error && <p className="error">{error}</p>}
-
-      <ul className="request-list">
-        {requests.map((r) => (
-          <li key={r.id}>
-            <p className="request-text">{r.text}</p>
-            <span className={`status status-${r.status}`}>{humanizeStatus(r.status)}</span>
-            <span className="request-time">
-              {new Date(r.created_at).toLocaleString()}
-            </span>
-            <button
-              type="button"
-              onClick={() => navigate(`/requests/${r.id}`)}
-              style={{ marginLeft: "0.75rem", fontSize: "0.8rem", padding: "2px 8px" }}
-            >
-              View detail
-            </button>
-            {r.subtasks?.length > 0 && (
-              <ul className="subtask-list">
-                {r.subtasks.map((s) => (
-                  <li key={s.id}>
-                    <span className="subtask-agent">{humanizeAgent(s.agent_type)}</span>
-                    <span className={`status status-${s.status}`}>{humanizeStatus(s.status)}</span>
-                    {s.confidence != null && (
-                      <span className={`confidence confidence-${confidenceTier(s.confidence)}`}>
-                        {Math.round(s.confidence * 100)}% confidence
-                      </span>
-                    )}
-                    {s.duration_ms != null && (
-                      <span className="request-time">{(s.duration_ms / 1000).toFixed(1)}s</span>
-                    )}
-                    <p className="subtask-result">{s.result}</p>
-                    {s.explanation && <p className="subtask-explanation">Why: {s.explanation}</p>}
-                    {s.approved_by_email && (
-                      <p className="subtask-explanation">
-                        Reviewed by {s.approved_by_email} at{" "}
-                        {new Date(s.approved_at).toLocaleString()}
-                      </p>
-                    )}
-                  </li>
-                ))}
-              </ul>
-            )}
-          </li>
-        ))}
-        {requests.length === 0 && <li className="empty">No requests yet.</li>}
-      </ul>
+        <ul className="request-list">
+          {requests.map((r) => (
+            <li key={r.id}>
+              <p className="request-text">{r.text}</p>
+              <span className={`status status-${r.status}`}>{humanizeStatus(r.status)}</span>
+              <span className="request-time">
+                {new Date(r.created_at).toLocaleString()}
+              </span>
+              <button
+                type="button"
+                onClick={() => navigate(`/requests/${r.id}`)}
+                style={{ alignSelf: "flex-start", fontSize: "0.8rem", padding: "2px 8px" }}
+              >
+                View detail
+              </button>
+              {r.subtasks?.length > 0 && (
+                <ul className="subtask-list">
+                  {r.subtasks.map((s) => (
+                    <li key={s.id}>
+                      <span className="subtask-agent">{humanizeAgent(s.agent_type)}</span>
+                      <span className={`status status-${s.status}`}>{humanizeStatus(s.status)}</span>
+                      {s.confidence != null && (
+                        <span className={`confidence confidence-${confidenceTier(s.confidence)}`}>
+                          {Math.round(s.confidence * 100)}% confidence
+                        </span>
+                      )}
+                      {s.duration_ms != null && (
+                        <span className="request-time">{(s.duration_ms / 1000).toFixed(1)}s</span>
+                      )}
+                      <p className="subtask-result">{s.result}</p>
+                      {s.explanation && <p className="subtask-explanation">Why: {s.explanation}</p>}
+                      {s.approved_by_email && (
+                        <p className="subtask-explanation">
+                          Reviewed by {s.approved_by_email} at{" "}
+                          {new Date(s.approved_at).toLocaleString()}
+                        </p>
+                      )}
+                    </li>
+                  ))}
+                </ul>
+              )}
+            </li>
+          ))}
+          {requests.length === 0 && <li className="empty">No requests yet.</li>}
+        </ul>
+      </div>
     </div>
   );
 }

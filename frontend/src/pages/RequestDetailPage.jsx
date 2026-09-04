@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import { Link, useParams } from "react-router-dom";
 import { getRequest } from "../api/requests";
+import NavBar from "../components/NavBar";
 import { humanizeAgent, humanizeStatus } from "../utils/labels";
 
 function confidenceTier(confidence) {
@@ -24,11 +25,8 @@ export default function RequestDetailPage() {
   if (error) {
     return (
       <div className="requests-page">
-        <header>
-          <h1>Request Detail</h1>
-          <Link to="/requests">← Back</Link>
-        </header>
-        <p className="error">{error}</p>
+        <NavBar />
+        <p className="error" style={{ padding: "1rem 1.5rem" }}>{error}</p>
       </div>
     );
   }
@@ -36,21 +34,18 @@ export default function RequestDetailPage() {
   if (!request) {
     return (
       <div className="requests-page">
-        <header>
-          <h1>Request Detail</h1>
-          <Link to="/requests">← Back</Link>
-        </header>
-        <p>Loading…</p>
+        <NavBar />
+        <p style={{ padding: "1rem 1.5rem" }}>Loading…</p>
       </div>
     );
   }
 
   return (
     <div className="requests-page">
-      <header>
-        <h1>Request #{request.id}</h1>
-        <Link to="/requests">← Back to requests</Link>
-      </header>
+      <NavBar />
+      <div className="page-content">
+      <Link to="/requests" style={{ fontSize: "14px" }}>← Back to requests</Link>
+      <h2 style={{ margin: "0.5rem 0 1rem" }}>Request #{request.id}</h2>
 
       <section className="admin-section">
         <table className="admin-table">
@@ -115,6 +110,7 @@ export default function RequestDetailPage() {
           ))}
         </section>
       )}
+      </div>
     </div>
   );
 }
