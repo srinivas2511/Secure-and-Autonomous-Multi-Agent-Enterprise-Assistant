@@ -1,4 +1,5 @@
 import logging
+from contextlib import asynccontextmanager
 
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
@@ -27,27 +28,11 @@ from app.rbac.seed import seed_default_permissions
 
 logger = logging.getLogger(__name__)
 
-app = FastAPI(title="Secure Autonomous Multi-Agent Enterprise Assistant")
-
-app.add_middleware(
-    CORSMiddleware,
-    allow_origins=settings.cors_origin_list,
-    allow_credentials=True,
-    allow_methods=["*"],
-    allow_headers=["*"],
-)
-
-app.include_router(auth.router)
-app.include_router(requests.router)
-app.include_router(approvals.router)
-app.include_router(admin.router)
-
-
 DEFAULT_JWT_SECRET = "change-me-in-production"
 
 
-@app.on_event("startup")
-def on_startup() -> None:
+@asynccontextmanager
+async def lifespan(app: FastAPI):
     # NFR-1: a default/well-known signing key lets anyone forge a valid JWT
     # for any user, including admin. Warn loudly rather than fail silently.
     if settings.jwt_secret_key == DEFAULT_JWT_SECRET:
@@ -96,6 +81,24 @@ def on_startup() -> None:
             "Could not ingest RAG documents on startup (is the chromadb service running?). "
             "The app will still start; the RAG agent will report errors until this is fixed."
         )
+
+    yield
+
+
+app = FastAPI(title="Secure Autonomous Multi-Agent Enterprise Assistant", lifespan=lifespan)
+
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=settings.cors_origin_list,
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
+
+app.include_router(auth.router)
+app.include_router(requests.router)
+app.include_router(approvals.router)
+app.include_router(admin.router)
 
 
 @app.get("/api/health")
