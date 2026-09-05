@@ -76,16 +76,16 @@ function MetricsNestedTable({ value }) {
   const entries = Object.entries(value);
   if (entries.length === 0) return <span>—</span>;
   return (
-    <table className="admin-table metrics-subtable">
-      <tbody>
-        {entries.map(([k, v]) => (
-          <tr key={k}>
-            <td style={{ fontWeight: "normal", color: "var(--text)" }}>{humanizeAgent(k)}</td>
-            <td>{typeof v === "number" && !Number.isInteger(v) ? v.toFixed(3) : String(v)}</td>
-          </tr>
-        ))}
-      </tbody>
-    </table>
+    <div className="metrics-subtable-list">
+      {entries.map(([k, v]) => (
+        <div key={k} className="metrics-subtable-row">
+          <span className="metrics-subtable-key">{humanizeAgent(k)}</span>
+          <span className="metrics-subtable-val">
+            {typeof v === "number" && !Number.isInteger(v) ? v.toFixed(3) : String(v)}
+          </span>
+        </div>
+      ))}
+    </div>
   );
 }
 

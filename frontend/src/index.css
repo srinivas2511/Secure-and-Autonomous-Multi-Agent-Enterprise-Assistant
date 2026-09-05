@@ -765,14 +765,27 @@ textarea {
 }
 
 /* Metrics nested sub-table (agent breakdown rows) */
-.metrics-subtable {
-  margin: 0;
-  width: 100%;
+.metrics-subtable-list {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
   font-size: 12px;
 }
 
-.metrics-subtable td {
-  padding: 1px 6px;
-  border-bottom: none;
+.metrics-subtable-row {
+  display: flex;
+  justify-content: space-between;
+  gap: 10px;
+  align-items: baseline;
+}
+
+.metrics-subtable-key {
+  color: var(--text);
+  white-space: nowrap;
+}
+
+.metrics-subtable-val {
+  font-weight: 500;
+  white-space: nowrap;
 }
 

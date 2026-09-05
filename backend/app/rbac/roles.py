@@ -10,7 +10,7 @@ VALID_ROLES = {"employee", "hr", "admin"}
 # seed. Live permission checks (can_use_agent) read from the DB
 # (role_permissions), which is admin-editable per FR-11.
 DEFAULT_ROLE_AGENT_PERMISSIONS: dict[str, set[str]] = {
-    "employee": {"rag", "workflow", "validation"},
+    "employee": {"rag", "workflow", "validation", "analytics"},
     "hr": {"rag", "workflow", "validation", "security", "analytics"},
     "admin": {"rag", "workflow", "validation", "security", "analytics"},
 }
