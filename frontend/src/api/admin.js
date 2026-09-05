@@ -68,3 +68,8 @@ export async function updateSettings(payload) {
   const { data } = await client.patch("/api/admin/settings", payload);
   return data;
 }
+
+export async function listAllRequests() {
+  const { data } = await client.get("/api/admin/requests");
+  return data;
+}

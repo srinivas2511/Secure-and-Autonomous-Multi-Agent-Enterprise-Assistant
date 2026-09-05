@@ -1,7 +1,8 @@
 from dataclasses import asdict
+from datetime import datetime
 
 from fastapi import APIRouter, Depends, HTTPException, Query, status
-from pydantic import BaseModel
+from pydantic import BaseModel, ConfigDict
 from sqlalchemy.orm import Session
 
 from app.agents.registry import AGENT_REGISTRY
@@ -11,6 +12,7 @@ from app.core.settings_store import get_all_settings, get_hitl_threshold, set_hi
 from app.hitl.gate import SENSITIVE_AGENT_TYPES
 from app.metrics.evaluator import compute_metrics
 from app.models.audit_log import AuditLog
+from app.models.enterprise_request import EnterpriseRequest
 from app.models.rag_evaluation_run import RagEvaluationRun
 from app.models.role_permission import RolePermission
 from app.models.sub_task import SubTask
@@ -34,6 +36,19 @@ DEFAULT_AUDIT_LOG_LIMIT = 100
 MAX_AUDIT_LOG_LIMIT = 500
 
 
+class AdminRequestOut(BaseModel):
+    model_config = ConfigDict(from_attributes=False)
+
+    id: int
+    user_id: int
+    requester_email: str
+    text: str
+    status: str
+    subtask_count: int
+    created_at: datetime
+    completed_at: datetime | None
+
+
 def _build_matrix(db: Session) -> PermissionsMatrixOut:
     rows = db.query(RolePermission).all()
     matrix: dict[str, list[str]] = {role: [] for role in sorted(VALID_ROLES)}
@@ -44,6 +59,34 @@ def _build_matrix(db: Session) -> PermissionsMatrixOut:
     return PermissionsMatrixOut(
         roles=sorted(VALID_ROLES), agent_types=sorted(get_agent_types()), matrix=matrix
     )
+
+
+@router.get("/requests", response_model=list[AdminRequestOut])
+def list_all_requests(
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+) -> list[AdminRequestOut]:
+    """Admin view: all requests across all users, newest first."""
+    require_admin(current_user)
+    rows = (
+        db.query(EnterpriseRequest)
+        .order_by(EnterpriseRequest.created_at.desc())
+        .limit(200)
+        .all()
+    )
+    return [
+        AdminRequestOut(
+            id=r.id,
+            user_id=r.user_id,
+            requester_email=r.user.email,
+            text=r.text,
+            status=r.status,
+            subtask_count=len(r.subtasks),
+            created_at=r.created_at,
+            completed_at=r.completed_at,
+        )
+        for r in rows
+    ]
 
 
 @router.get("/users", response_model=list[UserAdminOut])

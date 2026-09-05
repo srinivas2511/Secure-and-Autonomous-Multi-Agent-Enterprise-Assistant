@@ -24,6 +24,24 @@ export default function RequestsPage() {
     listRequests().then(setRequests).catch(() => setError("Could not load requests."));
   }, []);
 
+  // Auto-poll every 5 s while any subtask is pending_approval so the requester
+  // sees status updates without a manual reload.
+  useEffect(() => {
+    const hasPending = requests.some((r) =>
+      r.subtasks?.some((s) => s.status === "pending_approval")
+    );
+    if (!hasPending) return;
+    const timer = setInterval(async () => {
+      try {
+        const updated = await listRequests();
+        setRequests(updated);
+      } catch {
+        // silent — don't overwrite a prior error banner with a poll failure
+      }
+    }, 5000);
+    return () => clearInterval(timer);
+  }, [requests]);
+
   async function handleSubmit(event) {
     event.preventDefault();
     if (!text.trim()) return;

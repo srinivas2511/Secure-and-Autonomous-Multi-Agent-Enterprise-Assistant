@@ -604,3 +604,145 @@ textarea {
   margin: 2px 0 4px;
 }
 
+/* Subtask ID badge (shown on detail, approvals, trace) */
+.subtask-id-badge {
+  display: inline-block;
+  font-family: var(--mono);
+  font-size: 11px;
+  padding: 1px 6px;
+  border-radius: 4px;
+  background: var(--code-bg);
+  color: var(--text);
+  border: 1px solid var(--border);
+}
+
+/* Approval queue: "Waiting X ago" label */
+.approval-waiting {
+  font-size: 12px;
+  color: var(--text);
+  font-style: italic;
+}
+
+/* Rejection reason textarea area */
+.reject-reason-box {
+  background: var(--code-bg);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  padding: 10px 12px;
+  margin-top: 8px;
+}
+
+/* Action buttons on approval cards */
+.approve-btn {
+  color: #16a34a;
+  background: rgba(22, 163, 74, 0.08);
+  border-color: rgba(22, 163, 74, 0.4);
+}
+
+.reject-btn {
+  color: #dc2626;
+  background: rgba(220, 38, 38, 0.06);
+  border-color: rgba(220, 38, 38, 0.35);
+}
+
+.reject-confirm-btn {
+  color: #dc2626;
+  background: rgba(220, 38, 38, 0.1);
+  border-color: rgba(220, 38, 38, 0.5);
+  font-weight: 600;
+}
+
+.trace-btn {
+  font-size: 12px;
+  padding: 3px 10px;
+  color: var(--accent);
+  background: var(--accent-bg);
+  border-color: var(--accent-border);
+}
+
+/* Audit log: denial rows highlighted */
+.audit-row-denial td {
+  background: rgba(220, 38, 38, 0.05);
+}
+
+.audit-row-denial td:nth-child(3) {
+  color: #dc2626;
+  font-weight: 500;
+}
+
+/* Audit log: event type badges */
+.audit-type-badge {
+  font-size: 11px;
+  padding: 1px 6px;
+  border-radius: 4px;
+  white-space: nowrap;
+}
+
+.audit-type-data_access { background: rgba(59, 130, 246, 0.12); color: #2563eb; }
+.audit-type-approval    { background: rgba(22, 163, 74, 0.1);  color: #15803d; }
+.audit-type-auth        { background: rgba(124, 58, 237, 0.1); color: #7c3aed; }
+.audit-type-admin       { background: rgba(217, 119, 6, 0.1);  color: #b45309; }
+.audit-type-agent_action { background: var(--code-bg); color: var(--text); }
+
+/* Audit log: data_access context rendering */
+.data-access-context {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  font-size: 12px;
+}
+
+.data-access-sources {
+  list-style: none;
+  padding: 0;
+  margin: 2px 0 0;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+}
+
+.data-access-sources li {
+  background: var(--code-bg);
+  border: 1px solid var(--border);
+  border-radius: 3px;
+  padding: 1px 5px;
+  font-family: var(--mono);
+  font-size: 11px;
+  color: var(--text-h);
+}
+
+/* Inline trace button in audit subtask column */
+.trace-inline-btn {
+  font-family: var(--mono);
+  font-size: 11px;
+  padding: 1px 6px;
+  border-radius: 4px;
+  background: var(--accent-bg);
+  color: var(--accent);
+  border-color: var(--accent-border);
+  cursor: pointer;
+}
+
+/* Admin All Requests table: truncate long text */
+.request-cell-text {
+  max-width: 260px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* RAG eval: expected keyword chips */
+.keyword-list {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+}
+
+.keyword-chip {
+  font-size: 11px;
+  padding: 1px 6px;
+  background: rgba(124, 58, 237, 0.08);
+  color: #7c3aed;
+  border-radius: 3px;
+}
+

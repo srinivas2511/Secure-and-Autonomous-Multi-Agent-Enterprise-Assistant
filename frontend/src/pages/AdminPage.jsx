@@ -1,5 +1,5 @@
-import { useEffect, useState } from "react";
-import { Navigate } from "react-router-dom";
+import { useEffect, useRef, useState } from "react";
+import { Link, Navigate, useLocation, useNavigate } from "react-router-dom";
 import NavBar from "../components/NavBar";
 import {
   getDecisionTrace,
@@ -8,6 +8,7 @@ import {
   getPermissionsMatrix,
   getSettings,
   getSystemHealth,
+  listAllRequests,
   listAuditLogs,
   listUsers,
   runRagEvaluation,
@@ -41,6 +42,34 @@ function formatMetricValue(key, value) {
 
 function humanizeMetricKey(key) {
   return key.replace(/_/g, " ").replace(/^./, (c) => c.toUpperCase());
+}
+
+function renderAuditContext(entry) {
+  if (!entry.context) return "—";
+  if (entry.event_type === "data_access") {
+    const sources = entry.context.sources ?? [];
+    const sensitive = entry.context.sensitive;
+    return (
+      <span className="data-access-context">
+        {sensitive && <span className="hitl-reason" style={{ marginRight: "6px", fontSize: "10px" }}>Sensitive</span>}
+        <strong>Sources:</strong>{" "}
+        {sources.length > 0 ? (
+          <ul className="data-access-sources">
+            {sources.map((s) => <li key={s}>{s}</li>)}
+          </ul>
+        ) : "none"}
+      </span>
+    );
+  }
+  return (
+    <span className="audit-context">
+      {JSON.stringify(entry.context)}
+    </span>
+  );
+}
+
+function isDenialRow(action) {
+  return /\.(deny|denied|revoke)/.test(action);
 }
 
 function MetricsTable({ title, data }) {
@@ -142,7 +171,7 @@ function RagEvaluationSection() {
       {error && <p className="error">{error}</p>}
       {run && (
         <>
-          <table className="admin-table">
+          <table className="admin-table" style={{ marginTop: "12px" }}>
             <thead>
               <tr>
                 <th>Run at</th>
@@ -163,10 +192,11 @@ function RagEvaluationSection() {
               </tr>
             </tbody>
           </table>
-          <table className="admin-table">
+          <table className="admin-table" style={{ marginTop: "12px" }}>
             <thead>
               <tr>
                 <th>Question</th>
+                <th>Expected keywords</th>
                 <th>Baseline answer</th>
                 <th>Grounded answer</th>
                 <th>Sources</th>
@@ -176,6 +206,13 @@ function RagEvaluationSection() {
               {run.cases.map((c) => (
                 <tr key={c.question}>
                   <td>{c.question}</td>
+                  <td>
+                    <span className="keyword-list">
+                      {(c.expected_keywords ?? []).map((kw) => (
+                        <code key={kw} className="keyword-chip">{kw}</code>
+                      ))}
+                    </span>
+                  </td>
                   <td className={c.baseline_correct ? "confidence-high" : "confidence-low"}>
                     {c.baseline_answer}
                   </td>
@@ -320,6 +357,56 @@ function SettingsSection() {
   );
 }
 
+function AllRequestsSection() {
+  const [requests, setRequests] = useState([]);
+  const [error, setError] = useState("");
+
+  useEffect(() => {
+    listAllRequests().then(setRequests).catch(() => setError("Could not load requests."));
+  }, []);
+
+  return (
+    <section className="admin-section">
+      <h2>All Requests</h2>
+      <p className="subtask-explanation">All requests across every user, newest first.</p>
+      {error && <p className="error">{error}</p>}
+      <table className="admin-table">
+        <thead>
+          <tr>
+            <th>ID</th>
+            <th>Requester</th>
+            <th>Request text</th>
+            <th>Status</th>
+            <th>Subtasks</th>
+            <th>Submitted</th>
+            <th>Completed</th>
+          </tr>
+        </thead>
+        <tbody>
+          {requests.map((r) => (
+            <tr key={r.id}>
+              <td>
+                <Link to={`/requests/${r.id}`} style={{ color: "var(--accent)", textDecoration: "none" }}>
+                  #{r.id}
+                </Link>
+              </td>
+              <td>{r.requester_email}</td>
+              <td className="request-cell-text">{r.text}</td>
+              <td><span className={`status status-${r.status}`}>{humanizeStatus(r.status)}</span></td>
+              <td>{r.subtask_count}</td>
+              <td>{new Date(r.created_at).toLocaleString()}</td>
+              <td>{r.completed_at ? new Date(r.completed_at).toLocaleString() : "—"}</td>
+            </tr>
+          ))}
+          {requests.length === 0 && !error && (
+            <tr><td colSpan={7} style={{ color: "var(--text)" }}>No requests yet.</td></tr>
+          )}
+        </tbody>
+      </table>
+    </section>
+  );
+}
+
 function UsersSection({ currentUserId, roles }) {
   const [users, setUsers] = useState([]);
   const [error, setError] = useState("");
@@ -353,15 +440,18 @@ function UsersSection({ currentUserId, roles }) {
       <table className="admin-table">
         <thead>
           <tr>
+            <th>ID</th>
             <th>Email</th>
             <th>Name</th>
             <th>Role</th>
             <th>Active</th>
+            <th>Joined</th>
           </tr>
         </thead>
         <tbody>
           {users.map((u) => (
             <tr key={u.id}>
+              <td style={{ color: "var(--text)", fontSize: "12px" }}>#{u.id}</td>
               <td>{u.email}</td>
               <td>{u.full_name}</td>
               <td>
@@ -382,6 +472,9 @@ function UsersSection({ currentUserId, roles }) {
                   disabled={u.id === currentUserId}
                   onChange={() => handleActiveToggle(u)}
                 />
+              </td>
+              <td style={{ fontSize: "12px", color: "var(--text)" }}>
+                {new Date(u.created_at).toLocaleDateString()}
               </td>
             </tr>
           ))}
@@ -449,9 +542,14 @@ function PermissionsSection() {
 
 function AuditLogSection({ onTrace }) {
   const [logs, setLogs] = useState([]);
+  const [users, setUsers] = useState([]);
   const [eventType, setEventType] = useState("");
   const [userId, setUserId] = useState("");
   const [error, setError] = useState("");
+
+  useEffect(() => {
+    listUsers().then(setUsers).catch(() => {});
+  }, []);
 
   useEffect(() => {
     listAuditLogs(eventType || undefined, userId || undefined)
@@ -462,26 +560,29 @@ function AuditLogSection({ onTrace }) {
   return (
     <section className="admin-section">
       <h2>Audit Log</h2>
-      <label className="audit-filter">
-        Event type
-        <select value={eventType} onChange={(e) => setEventType(e.target.value)}>
-          {EVENT_TYPES.map((t) => (
-            <option key={t} value={t}>
-              {t || "All"}
-            </option>
-          ))}
-        </select>
-      </label>
-      <label className="audit-filter">
-        User ID
-        <input
-          type="number"
-          min="1"
-          value={userId}
-          onChange={(e) => setUserId(e.target.value)}
-          placeholder="All users"
-        />
-      </label>
+      <div style={{ display: "flex", gap: "16px", flexWrap: "wrap", marginBottom: "12px" }}>
+        <label className="audit-filter">
+          Event type
+          <select value={eventType} onChange={(e) => setEventType(e.target.value)}>
+            {EVENT_TYPES.map((t) => (
+              <option key={t} value={t}>
+                {t || "All"}
+              </option>
+            ))}
+          </select>
+        </label>
+        <label className="audit-filter">
+          Filter by user
+          <select value={userId} onChange={(e) => setUserId(e.target.value)}>
+            <option value="">All users</option>
+            {users.map((u) => (
+              <option key={u.id} value={String(u.id)}>
+                {u.email}
+              </option>
+            ))}
+          </select>
+        </label>
+      </div>
       {error && <p className="error">{error}</p>}
       <table className="admin-table">
         <thead>
@@ -499,15 +600,39 @@ function AuditLogSection({ onTrace }) {
         </thead>
         <tbody>
           {logs.map((log) => (
-            <tr key={log.id}>
+            <tr key={log.id} className={isDenialRow(log.action) ? "audit-row-denial" : ""}>
               <td>{new Date(log.created_at).toLocaleString()}</td>
-              <td>{log.event_type}</td>
+              <td>
+                <span className={`audit-type-badge audit-type-${log.event_type}`}>
+                  {log.event_type}
+                </span>
+              </td>
               <td>{log.action}</td>
               <td>{log.user_email ?? "—"}</td>
               <td>{log.role ?? "—"}</td>
-              <td>{log.request_id ?? "—"}</td>
-              <td>{log.subtask_id ?? "—"}</td>
-              <td className="audit-context">{log.context ? JSON.stringify(log.context) : "—"}</td>
+              <td>
+                {log.request_id != null ? (
+                  <Link
+                    to={`/requests/${log.request_id}`}
+                    style={{ color: "var(--accent)", textDecoration: "none" }}
+                  >
+                    #{log.request_id}
+                  </Link>
+                ) : "—"}
+              </td>
+              <td>
+                {log.subtask_id != null ? (
+                  <button
+                    type="button"
+                    className="trace-inline-btn"
+                    onClick={() => onTrace(log.subtask_id)}
+                    title="Trace this subtask"
+                  >
+                    #{log.subtask_id}
+                  </button>
+                ) : "—"}
+              </td>
+              <td>{renderAuditContext(log)}</td>
               <td>
                 {log.subtask_id != null && (
                   <button type="button" onClick={() => onTrace(log.subtask_id)}>
@@ -533,6 +658,7 @@ function TraceSection({ requestedSubtaskId, requestNonce }) {
   const [trace, setTrace] = useState(null);
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
+  const sectionRef = useRef(null);
 
   async function lookup(id) {
     if (!id) return;
@@ -553,6 +679,7 @@ function TraceSection({ requestedSubtaskId, requestNonce }) {
     if (requestedSubtaskId != null) {
       setSubtaskIdInput(String(requestedSubtaskId));
       lookup(requestedSubtaskId);
+      sectionRef.current?.scrollIntoView({ behavior: "smooth", block: "start" });
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [requestedSubtaskId, requestNonce]);
@@ -563,7 +690,7 @@ function TraceSection({ requestedSubtaskId, requestNonce }) {
   }
 
   return (
-    <section className="admin-section">
+    <section className="admin-section" ref={sectionRef}>
       <h2>Trace a Decision</h2>
       <p className="subtask-explanation">
         Assembles the full causal trail for one subtask -- its own rationale/confidence, the
@@ -586,9 +713,22 @@ function TraceSection({ requestedSubtaskId, requestNonce }) {
           <table className="admin-table">
             <tbody>
               <tr>
+                <td>Subtask</td>
+                <td>
+                  <span className="subtask-id-badge">#{trace.subtask.id}</span>
+                  {" "}{humanizeAgent(trace.subtask.agent_type)}
+                </td>
+              </tr>
+              <tr>
                 <td>Request</td>
                 <td>
-                  #{trace.request.id} — "{trace.request.text}"
+                  <Link
+                    to={`/requests/${trace.request.id}`}
+                    style={{ color: "var(--accent)", textDecoration: "none" }}
+                  >
+                    #{trace.request.id}
+                  </Link>
+                  {" — "}&quot;{trace.request.text}&quot;
                 </td>
               </tr>
               <tr>
@@ -596,12 +736,12 @@ function TraceSection({ requestedSubtaskId, requestNonce }) {
                 <td>{trace.request.requester_email}</td>
               </tr>
               <tr>
-                <td>Agent</td>
-                <td>{humanizeAgent(trace.subtask.agent_type)}</td>
-              </tr>
-              <tr>
                 <td>Status</td>
-                <td>{humanizeStatus(trace.subtask.status)}</td>
+                <td>
+                  <span className={`status status-${trace.subtask.status}`}>
+                    {humanizeStatus(trace.subtask.status)}
+                  </span>
+                </td>
               </tr>
               <tr>
                 <td>Confidence</td>
@@ -613,7 +753,7 @@ function TraceSection({ requestedSubtaskId, requestNonce }) {
               </tr>
               <tr>
                 <td>Result</td>
-                <td>{trace.subtask.result}</td>
+                <td style={{ whiteSpace: "pre-line" }}>{trace.subtask.result}</td>
               </tr>
               <tr>
                 <td>Explanation</td>
@@ -630,7 +770,7 @@ function TraceSection({ requestedSubtaskId, requestNonce }) {
               )}
             </tbody>
           </table>
-          <h3>Audit Trail</h3>
+          <h3 style={{ marginTop: "1rem" }}>Audit Trail</h3>
           <table className="admin-table">
             <thead>
               <tr>
@@ -643,14 +783,16 @@ function TraceSection({ requestedSubtaskId, requestNonce }) {
             </thead>
             <tbody>
               {trace.audit_trail.map((entry) => (
-                <tr key={entry.id}>
+                <tr key={entry.id} className={isDenialRow(entry.action) ? "audit-row-denial" : ""}>
                   <td>{new Date(entry.created_at).toLocaleString()}</td>
-                  <td>{entry.event_type}</td>
+                  <td>
+                    <span className={`audit-type-badge audit-type-${entry.event_type}`}>
+                      {entry.event_type}
+                    </span>
+                  </td>
                   <td>{entry.action}</td>
                   <td>{entry.role ?? "—"}</td>
-                  <td className="audit-context">
-                    {entry.context ? JSON.stringify(entry.context) : "—"}
-                  </td>
+                  <td>{renderAuditContext(entry)}</td>
                 </tr>
               ))}
               {trace.audit_trail.length === 0 && (
@@ -668,6 +810,7 @@ function TraceSection({ requestedSubtaskId, requestNonce }) {
 
 export default function AdminPage() {
   const { user } = useAuth();
+  const location = useLocation();
   const [traceRequest, setTraceRequest] = useState({ subtaskId: null, nonce: 0 });
   const [roles, setRoles] = useState(["employee", "hr", "admin"]);
 
@@ -676,6 +819,13 @@ export default function AdminPage() {
       .then((data) => setRoles(data.roles))
       .catch(() => {});
   }, []);
+
+  // Support navigating here with a pre-filled trace (e.g. from ApprovalsPage)
+  useEffect(() => {
+    if (location.state?.traceSubtaskId != null) {
+      setTraceRequest({ subtaskId: location.state.traceSubtaskId, nonce: Date.now() });
+    }
+  }, [location.state]);
 
   if (user && user.role !== "admin") {
     return <Navigate to="/requests" replace />;
@@ -693,6 +843,7 @@ export default function AdminPage() {
           <>
             <SystemHealthSection />
             <SettingsSection />
+            <AllRequestsSection />
             <UsersSection currentUserId={user.id} roles={roles} />
             <PermissionsSection />
             <AuditLogSection onTrace={handleTrace} />

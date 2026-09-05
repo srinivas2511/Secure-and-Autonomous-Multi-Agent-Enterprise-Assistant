@@ -43,14 +43,11 @@ def get_request(
     current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db),
 ) -> EnterpriseRequest:
-    enterprise_request = (
-        db.query(EnterpriseRequest)
-        .filter(
-            EnterpriseRequest.id == request_id,
-            EnterpriseRequest.user_id == current_user.id,
-        )
-        .first()
-    )
+    query = db.query(EnterpriseRequest).filter(EnterpriseRequest.id == request_id)
+    # Admins can view any request; other roles see only their own.
+    if current_user.role != "admin":
+        query = query.filter(EnterpriseRequest.user_id == current_user.id)
+    enterprise_request = query.first()
     if enterprise_request is None:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Request not found")
     return enterprise_request
