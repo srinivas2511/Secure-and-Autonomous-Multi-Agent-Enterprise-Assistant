@@ -13,9 +13,9 @@ from app.schemas.user import UserCreate, UserOut
 
 DEMO_PASSWORD = "demo1234"
 DEMO_ACCOUNTS = {
-    "admin":    {"email": "admin@demo.local",    "full_name": "Demo Admin"},
-    "hr":       {"email": "hr@demo.local",       "full_name": "Demo HR"},
-    "employee": {"email": "employee@demo.local", "full_name": "Demo Employee"},
+    "admin":    {"email": "admin@enterprise-demo.com",    "full_name": "Demo Admin"},
+    "hr":       {"email": "hr@enterprise-demo.com",       "full_name": "Demo HR"},
+    "employee": {"email": "employee@enterprise-demo.com", "full_name": "Demo Employee"},
 }
 
 router = APIRouter(prefix="/api/auth", tags=["auth"])

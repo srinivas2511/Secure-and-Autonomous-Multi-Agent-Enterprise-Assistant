@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
-import { demoLogin, fetchCurrentUser } from "../api/auth";
+import { demoLogin } from "../api/auth";
 import { useAuth } from "../context/AuthContext";
 
 const DEMO_ROLES = [
@@ -38,8 +38,6 @@ export default function LoginPage() {
     try {
       const { access_token } = await demoLogin(role);
       localStorage.setItem("access_token", access_token);
-      const currentUser = await fetchCurrentUser();
-      // Refresh auth context by reloading — simplest way to set user state
       window.location.href = "/requests";
     } catch {
       setError("Could not sign in to demo account.");

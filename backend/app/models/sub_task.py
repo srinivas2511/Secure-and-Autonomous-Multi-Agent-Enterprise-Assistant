@@ -40,7 +40,7 @@ class SubTask(Base):
     request: Mapped["EnterpriseRequest"] = relationship(back_populates="subtasks")
     approver: Mapped["User | None"] = relationship(foreign_keys=[approved_by])
     workflow_executions: Mapped[list["WorkflowExecution"]] = relationship(
-        "WorkflowExecution", foreign_keys="WorkflowExecution.subtask_id", order_by="WorkflowExecution.step_number"
+        "WorkflowExecution", foreign_keys="WorkflowExecution.subtask_id"
     )
 
     @property
@@ -51,5 +51,5 @@ class SubTask(Base):
     def workflow_steps(self) -> list[dict]:
         return [
             {"step": we.step_number, "function": we.function_name, "output": we.output}
-            for we in self.workflow_executions
+            for we in sorted(self.workflow_executions, key=lambda x: x.step_number)
         ]
