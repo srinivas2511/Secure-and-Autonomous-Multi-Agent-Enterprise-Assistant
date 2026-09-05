@@ -50,6 +50,11 @@ class SubTask(Base):
     @property
     def workflow_steps(self) -> list[dict]:
         return [
-            {"step": we.step_number, "function": we.function_name, "output": we.output}
+            {
+                "step": we.step_number,
+                "function": we.function_name,
+                "output": we.output,
+                "created_at": we.created_at.isoformat() if we.created_at else None,
+            }
             for we in sorted(self.workflow_executions, key=lambda x: x.step_number)
         ]
