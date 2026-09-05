@@ -1,10 +1,14 @@
 from dataclasses import asdict
 
 from fastapi import APIRouter, Depends, HTTPException, Query, status
+from pydantic import BaseModel
 from sqlalchemy.orm import Session
 
+from app.agents.registry import AGENT_REGISTRY
 from app.api.deps import get_current_user, get_db
 from app.audit.logger import log_event
+from app.core.settings_store import get_all_settings, get_hitl_threshold, set_hitl_threshold
+from app.hitl.gate import SENSITIVE_AGENT_TYPES
 from app.metrics.evaluator import compute_metrics
 from app.models.audit_log import AuditLog
 from app.models.rag_evaluation_run import RagEvaluationRun
@@ -250,3 +254,69 @@ def get_decision_trace(
         ),
         audit_trail=audit_trail,
     )
+
+
+@router.get("/system-health")
+def get_system_health(
+    current_user: User = Depends(get_current_user), db: Session = Depends(get_db)
+) -> dict:
+    require_admin(current_user)
+
+    user_count = db.query(User).count()
+    active_user_count = db.query(User).filter(User.is_active.is_(True)).count()
+    permission_count = db.query(RolePermission).count()
+
+    agents = [
+        {
+            "type": agent_type,
+            "sensitive": agent_type in SENSITIVE_AGENT_TYPES,
+        }
+        for agent_type in sorted(AGENT_REGISTRY.keys())
+    ]
+
+    try:
+        from app.rag.vector_store import get_collection
+        collection = get_collection()
+        doc_count = collection.count()
+        rag_status = "ok"
+    except Exception as exc:
+        doc_count = 0
+        rag_status = str(exc)
+
+    return {
+        "db": {
+            "status": "ok",
+            "user_count": user_count,
+            "active_user_count": active_user_count,
+            "permission_count": permission_count,
+        },
+        "agents": agents,
+        "rag": {"status": rag_status, "document_count": doc_count},
+        "hitl_confidence_threshold": get_hitl_threshold(),
+    }
+
+
+class SettingsUpdate(BaseModel):
+    hitl_confidence_threshold: float | None = None
+
+
+@router.get("/settings")
+def get_settings(
+    current_user: User = Depends(get_current_user),
+) -> dict:
+    require_admin(current_user)
+    return get_all_settings()
+
+
+@router.patch("/settings")
+def update_settings(
+    payload: SettingsUpdate,
+    current_user: User = Depends(get_current_user),
+) -> dict:
+    require_admin(current_user)
+    if payload.hitl_confidence_threshold is not None:
+        try:
+            set_hitl_threshold(payload.hitl_confidence_threshold)
+        except ValueError as exc:
+            raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(exc)) from exc
+    return get_all_settings()

@@ -17,3 +17,4 @@ class SubTaskOut(BaseModel):
     approved_by_email: str | None
     approved_at: datetime | None
     created_at: datetime
+    workflow_steps: list[dict] = []

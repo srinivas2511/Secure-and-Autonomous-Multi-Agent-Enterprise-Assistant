@@ -53,3 +53,18 @@ export async function getDecisionTrace(subtaskId) {
   const { data } = await client.get(`/api/admin/trace/${subtaskId}`);
   return data;
 }
+
+export async function getSystemHealth() {
+  const { data } = await client.get("/api/admin/system-health");
+  return data;
+}
+
+export async function getSettings() {
+  const { data } = await client.get("/api/admin/settings");
+  return data;
+}
+
+export async function updateSettings(payload) {
+  const { data } = await client.patch("/api/admin/settings", payload);
+  return data;
+}

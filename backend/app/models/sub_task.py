@@ -39,7 +39,17 @@ class SubTask(Base):
 
     request: Mapped["EnterpriseRequest"] = relationship(back_populates="subtasks")
     approver: Mapped["User | None"] = relationship(foreign_keys=[approved_by])
+    workflow_executions: Mapped[list["WorkflowExecution"]] = relationship(
+        "WorkflowExecution", foreign_keys="WorkflowExecution.subtask_id", order_by="WorkflowExecution.step_number"
+    )
 
     @property
     def approved_by_email(self) -> str | None:
         return self.approver.email if self.approver else None
+
+    @property
+    def workflow_steps(self) -> list[dict]:
+        return [
+            {"step": we.step_number, "function": we.function_name, "output": we.output}
+            for we in self.workflow_executions
+        ]

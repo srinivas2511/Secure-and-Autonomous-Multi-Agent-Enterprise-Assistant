@@ -5,6 +5,12 @@ import { useAuth } from "../context/AuthContext";
 import NavBar from "../components/NavBar";
 import { humanizeAgent } from "../utils/labels";
 
+function hitlReason(p) {
+  if (p.agent_type === "workflow") return "Escalated: workflow actions require human sign-off";
+  if (p.confidence != null && p.confidence < 0.5) return "Escalated: confidence below threshold";
+  return "Escalated: sensitive data accessed";
+}
+
 export default function ApprovalsPage() {
   const { user } = useAuth();
   const [pending, setPending] = useState([]);
@@ -63,6 +69,7 @@ export default function ApprovalsPage() {
             {p.confidence != null && (
               <span className="confidence">{Math.round(p.confidence * 100)}% confidence</span>
             )}
+            <p className="hitl-reason">{hitlReason(p)}</p>
             <p className="subtask-result">{p.result}</p>
             {p.explanation && <p className="subtask-explanation">Why: {p.explanation}</p>}
             <div className="approval-actions">

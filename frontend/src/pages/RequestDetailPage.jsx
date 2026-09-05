@@ -11,6 +11,14 @@ function confidenceTier(confidence) {
   return "high";
 }
 
+function hitlReason(subtask) {
+  if (subtask.status !== "pending_approval" && subtask.status !== "completed") return null;
+  if (subtask.agent_type === "workflow") return "Escalated: workflow actions require human sign-off";
+  if (subtask.confidence != null && subtask.confidence < 0.5) return "Escalated: confidence below threshold";
+  if (subtask.status === "pending_approval") return "Escalated: sensitive data accessed";
+  return null;
+}
+
 export default function RequestDetailPage() {
   const { id } = useParams();
   const [request, setRequest] = useState(null);
@@ -93,12 +101,32 @@ export default function RequestDetailPage() {
                   <span className="request-time">{(s.duration_ms / 1000).toFixed(1)}s</span>
                 )}
               </div>
+              {hitlReason(s) && (
+                <p className="hitl-reason">{hitlReason(s)}</p>
+              )}
               {s.description && (
                 <p className="subtask-explanation">Task: {s.description}</p>
               )}
               {s.result && <p className="subtask-result">{s.result}</p>}
               {s.explanation && (
                 <p className="subtask-explanation">Why: {s.explanation}</p>
+              )}
+              {s.workflow_steps?.length > 0 && (
+                <details style={{ marginTop: "0.5rem" }}>
+                  <summary style={{ fontSize: "13px", cursor: "pointer", color: "var(--accent)" }}>
+                    {s.workflow_steps.length} workflow step{s.workflow_steps.length !== 1 ? "s" : ""}
+                  </summary>
+                  <ol className="workflow-steps">
+                    {s.workflow_steps.map((step) => (
+                      <li key={step.step}>
+                        <code>{step.function}</code>
+                        {step.output && Object.keys(step.output).length > 0 && (
+                          <pre className="workflow-output">{JSON.stringify(step.output, null, 2)}</pre>
+                        )}
+                      </li>
+                    ))}
+                  </ol>
+                </details>
               )}
               {s.approved_by_email && (
                 <p className="subtask-explanation">

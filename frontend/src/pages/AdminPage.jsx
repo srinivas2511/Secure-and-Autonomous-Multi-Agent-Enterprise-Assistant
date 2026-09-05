@@ -6,10 +6,13 @@ import {
   getLatestRagEvaluation,
   getMetrics,
   getPermissionsMatrix,
+  getSettings,
+  getSystemHealth,
   listAuditLogs,
   listUsers,
   runRagEvaluation,
   togglePermission,
+  updateSettings,
   updateUser,
 } from "../api/admin";
 import { useAuth } from "../context/AuthContext";
@@ -187,6 +190,132 @@ function RagEvaluationSection() {
         </>
       )}
       {!run && !error && <p>No evaluation has been run yet.</p>}
+    </section>
+  );
+}
+
+function SystemHealthSection() {
+  const [health, setHealth] = useState(null);
+  const [error, setError] = useState("");
+
+  useEffect(() => {
+    getSystemHealth().then(setHealth).catch(() => setError("Could not load system health."));
+  }, []);
+
+  if (error) return <section className="admin-section"><h2>System Health</h2><p className="error">{error}</p></section>;
+  if (!health) return null;
+
+  return (
+    <section className="admin-section">
+      <h2>System Health</h2>
+      <div className="metrics-grid">
+        <div>
+          <h3>Database</h3>
+          <table className="admin-table">
+            <tbody>
+              <tr><td>Status</td><td><span className="status status-completed">{health.db.status}</span></td></tr>
+              <tr><td>Users</td><td>{health.db.user_count} ({health.db.active_user_count} active)</td></tr>
+              <tr><td>Permissions</td><td>{health.db.permission_count} rules</td></tr>
+            </tbody>
+          </table>
+        </div>
+        <div>
+          <h3>RAG / ChromaDB</h3>
+          <table className="admin-table">
+            <tbody>
+              <tr>
+                <td>Status</td>
+                <td>
+                  <span className={`status ${health.rag.status === "ok" ? "status-completed" : "status-failed"}`}>
+                    {health.rag.status}
+                  </span>
+                </td>
+              </tr>
+              <tr><td>Documents</td><td>{health.rag.document_count}</td></tr>
+            </tbody>
+          </table>
+        </div>
+        <div>
+          <h3>Agents</h3>
+          <table className="admin-table">
+            <tbody>
+              {health.agents.map((a) => (
+                <tr key={a.type}>
+                  <td>{humanizeAgent(a.type)}</td>
+                  <td>
+                    <span className="status status-completed">registered</span>
+                    {a.sensitive && <span className="hitl-reason" style={{ marginLeft: "6px" }}>HITL always</span>}
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </section>
+  );
+}
+
+function SettingsSection() {
+  const [threshold, setThreshold] = useState(null);
+  const [draft, setDraft] = useState("");
+  const [saving, setSaving] = useState(false);
+  const [error, setError] = useState("");
+  const [saved, setSaved] = useState(false);
+
+  useEffect(() => {
+    getSettings().then((s) => {
+      setThreshold(s.hitl_confidence_threshold);
+      setDraft(String(Math.round(s.hitl_confidence_threshold * 100)));
+    }).catch(() => setError("Could not load settings."));
+  }, []);
+
+  async function handleSave(e) {
+    e.preventDefault();
+    const val = parseFloat(draft) / 100;
+    if (Number.isNaN(val) || val < 0 || val > 1) {
+      setError("Enter a value between 0 and 100.");
+      return;
+    }
+    setSaving(true);
+    setError("");
+    try {
+      const updated = await updateSettings({ hitl_confidence_threshold: val });
+      setThreshold(updated.hitl_confidence_threshold);
+      setSaved(true);
+      setTimeout(() => setSaved(false), 2000);
+    } catch {
+      setError("Could not save settings.");
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  return (
+    <section className="admin-section">
+      <h2>Settings</h2>
+      <p className="subtask-explanation">
+        HITL confidence threshold: subtasks with confidence below this value are automatically
+        escalated to human review. Default is 50%. Resets to 50% on server restart.
+      </p>
+      {error && <p className="error">{error}</p>}
+      {threshold !== null && (
+        <form onSubmit={handleSave} style={{ display: "flex", alignItems: "center", gap: "10px", marginTop: "8px" }}>
+          <label style={{ fontSize: "14px" }}>
+            HITL threshold (%)
+            <input
+              type="number"
+              min="0"
+              max="100"
+              value={draft}
+              onChange={(e) => setDraft(e.target.value)}
+              style={{ width: "80px", marginLeft: "8px" }}
+            />
+          </label>
+          <button type="submit" disabled={saving}>{saving ? "Saving..." : "Save"}</button>
+          {saved && <span style={{ color: "#16a34a", fontSize: "13px" }}>Saved</span>}
+        </form>
+      )}
     </section>
   );
 }
@@ -562,6 +691,8 @@ export default function AdminPage() {
       <div className="page-content">
         {user && (
           <>
+            <SystemHealthSection />
+            <SettingsSection />
             <UsersSection currentUserId={user.id} roles={roles} />
             <PermissionsSection />
             <AuditLogSection onTrace={handleTrace} />
