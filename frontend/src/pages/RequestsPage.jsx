@@ -102,6 +102,9 @@ export default function RequestsPage() {
                     <li key={s.id}>
                       <span className="subtask-agent">{humanizeAgent(s.agent_type)}</span>
                       <span className={`status status-${s.status}`}>{humanizeStatus(s.status)}</span>
+                      {s.description && (
+                        <p className="subtask-explanation" style={{ margin: "2px 0" }}>Task: {s.description}</p>
+                      )}
                       {s.confidence != null && (
                         <span className={`confidence confidence-${confidenceTier(s.confidence)}`}>
                           {Math.round(s.confidence * 100)}% confidence

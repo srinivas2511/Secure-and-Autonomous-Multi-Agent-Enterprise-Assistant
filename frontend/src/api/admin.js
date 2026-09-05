@@ -24,10 +24,11 @@ export async function togglePermission(role, agentType, allowed) {
   return data;
 }
 
-export async function listAuditLogs(eventType, userId) {
+export async function listAuditLogs(eventType, userId, limit) {
   const params = {};
   if (eventType) params.event_type = eventType;
   if (userId) params.user_id = userId;
+  if (limit) params.limit = limit;
   const { data } = await client.get("/api/admin/audit-logs", { params });
   return data;
 }

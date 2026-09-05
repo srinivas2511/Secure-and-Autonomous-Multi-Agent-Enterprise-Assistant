@@ -72,6 +72,23 @@ function isDenialRow(action) {
   return /\.(deny|denied|revoke)/.test(action);
 }
 
+function MetricsNestedTable({ value }) {
+  const entries = Object.entries(value);
+  if (entries.length === 0) return <span>—</span>;
+  return (
+    <table className="admin-table metrics-subtable">
+      <tbody>
+        {entries.map(([k, v]) => (
+          <tr key={k}>
+            <td style={{ fontWeight: "normal", color: "var(--text)" }}>{humanizeAgent(k)}</td>
+            <td>{typeof v === "number" && !Number.isInteger(v) ? v.toFixed(3) : String(v)}</td>
+          </tr>
+        ))}
+      </tbody>
+    </table>
+  );
+}
+
 function MetricsTable({ title, data }) {
   return (
     <div>
@@ -87,7 +104,11 @@ function MetricsTable({ title, data }) {
           {Object.entries(data).map(([key, value]) => (
             <tr key={key}>
               <td>{humanizeMetricKey(key)}</td>
-              <td>{formatMetricValue(key, value)}</td>
+              <td>
+                {value != null && typeof value === "object"
+                  ? <MetricsNestedTable value={value} />
+                  : formatMetricValue(key, value)}
+              </td>
             </tr>
           ))}
         </tbody>
@@ -357,18 +378,35 @@ function SettingsSection() {
   );
 }
 
+const REQUEST_STATUSES = ["", "pending", "processing", "pending_approval", "completed", "failed"];
+
 function AllRequestsSection() {
   const [requests, setRequests] = useState([]);
+  const [statusFilter, setStatusFilter] = useState("");
   const [error, setError] = useState("");
 
   useEffect(() => {
     listAllRequests().then(setRequests).catch(() => setError("Could not load requests."));
   }, []);
 
+  const filtered = statusFilter
+    ? requests.filter((r) => r.status === statusFilter)
+    : requests;
+
   return (
     <section className="admin-section">
       <h2>All Requests</h2>
-      <p className="subtask-explanation">All requests across every user, newest first.</p>
+      <div style={{ display: "flex", gap: "16px", flexWrap: "wrap", marginBottom: "12px" }}>
+        <p className="subtask-explanation" style={{ margin: 0, alignSelf: "center" }}>All requests across every user, newest first.</p>
+        <label className="audit-filter">
+          Status
+          <select value={statusFilter} onChange={(e) => setStatusFilter(e.target.value)}>
+            {REQUEST_STATUSES.map((s) => (
+              <option key={s} value={s}>{s || "All"}</option>
+            ))}
+          </select>
+        </label>
+      </div>
       {error && <p className="error">{error}</p>}
       <table className="admin-table">
         <thead>
@@ -383,7 +421,7 @@ function AllRequestsSection() {
           </tr>
         </thead>
         <tbody>
-          {requests.map((r) => (
+          {filtered.map((r) => (
             <tr key={r.id}>
               <td>
                 <Link to={`/requests/${r.id}`} style={{ color: "var(--accent)", textDecoration: "none" }}>
@@ -398,8 +436,8 @@ function AllRequestsSection() {
               <td>{r.completed_at ? new Date(r.completed_at).toLocaleString() : "—"}</td>
             </tr>
           ))}
-          {requests.length === 0 && !error && (
-            <tr><td colSpan={7} style={{ color: "var(--text)" }}>No requests yet.</td></tr>
+          {filtered.length === 0 && !error && (
+            <tr><td colSpan={7} style={{ color: "var(--text)" }}>No requests{statusFilter ? ` with status "${statusFilter}"` : ""} yet.</td></tr>
           )}
         </tbody>
       </table>
@@ -540,11 +578,14 @@ function PermissionsSection() {
   );
 }
 
+const AUDIT_LIMITS = [100, 250, 500];
+
 function AuditLogSection({ onTrace }) {
   const [logs, setLogs] = useState([]);
   const [users, setUsers] = useState([]);
   const [eventType, setEventType] = useState("");
   const [userId, setUserId] = useState("");
+  const [limit, setLimit] = useState(100);
   const [error, setError] = useState("");
 
   useEffect(() => {
@@ -552,10 +593,10 @@ function AuditLogSection({ onTrace }) {
   }, []);
 
   useEffect(() => {
-    listAuditLogs(eventType || undefined, userId || undefined)
+    listAuditLogs(eventType || undefined, userId || undefined, limit)
       .then(setLogs)
       .catch(() => setError("Could not load audit logs."));
-  }, [eventType, userId]);
+  }, [eventType, userId, limit]);
 
   return (
     <section className="admin-section">
@@ -579,6 +620,14 @@ function AuditLogSection({ onTrace }) {
               <option key={u.id} value={String(u.id)}>
                 {u.email}
               </option>
+            ))}
+          </select>
+        </label>
+        <label className="audit-filter">
+          Show
+          <select value={limit} onChange={(e) => setLimit(Number(e.target.value))}>
+            {AUDIT_LIMITS.map((l) => (
+              <option key={l} value={l}>{l} entries</option>
             ))}
           </select>
         </label>

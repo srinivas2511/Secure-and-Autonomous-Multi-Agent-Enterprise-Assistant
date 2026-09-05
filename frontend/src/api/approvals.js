@@ -5,6 +5,11 @@ export async function listPendingApprovals() {
   return data;
 }
 
+export async function getPendingCount() {
+  const { data } = await client.get("/api/approvals/count");
+  return data.count;
+}
+
 export async function approveSubtask(id) {
   const { data } = await client.post(`/api/approvals/${id}/approve`);
   return data;

@@ -119,6 +119,11 @@ export default function RequestDetailPage() {
                   )}
                 </div>
 
+                {s.created_at && (
+                  <p className="subtask-explanation" style={{ fontSize: "11px", color: "var(--text)" }}>
+                    Started {new Date(s.created_at).toLocaleString()}
+                  </p>
+                )}
                 {hitlReason(s) && (
                   <p className="hitl-reason">{hitlReason(s)}</p>
                 )}

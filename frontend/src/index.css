@@ -746,3 +746,33 @@ textarea {
   border-radius: 3px;
 }
 
+/* Pending count badge on navbar Approvals link */
+.nav-badge {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 16px;
+  height: 16px;
+  padding: 0 4px;
+  margin-left: 5px;
+  font-size: 10px;
+  font-weight: 700;
+  line-height: 1;
+  border-radius: 8px;
+  background: #dc2626;
+  color: #fff;
+  vertical-align: middle;
+}
+
+/* Metrics nested sub-table (agent breakdown rows) */
+.metrics-subtable {
+  margin: 0;
+  width: 100%;
+  font-size: 12px;
+}
+
+.metrics-subtable td {
+  padding: 1px 6px;
+  border-bottom: none;
+}
+

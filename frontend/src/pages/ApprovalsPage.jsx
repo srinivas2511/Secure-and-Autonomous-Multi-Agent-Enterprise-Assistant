@@ -100,6 +100,9 @@ export default function ApprovalsPage() {
 
               <p className="hitl-reason">{hitlReason(p)}</p>
 
+              {p.description && (
+                <p className="subtask-explanation">Task: {p.description}</p>
+              )}
               {p.result && <p className="subtask-result">{p.result}</p>}
               {p.explanation && <p className="subtask-explanation">Why: {p.explanation}</p>}
 

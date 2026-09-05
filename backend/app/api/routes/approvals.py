@@ -42,6 +42,15 @@ def _to_out(subtask: SubTask) -> PendingApprovalOut:
     )
 
 
+@router.get("/count")
+def get_pending_count(
+    current_user: User = Depends(get_current_user), db: Session = Depends(get_db)
+) -> dict:
+    require_admin(current_user, "Only admins may review pending approvals.")
+    count = db.query(SubTask).filter(SubTask.status == "pending_approval").count()
+    return {"count": count}
+
+
 @router.get("", response_model=list[PendingApprovalOut])
 def list_pending_approvals(
     current_user: User = Depends(get_current_user), db: Session = Depends(get_db)
