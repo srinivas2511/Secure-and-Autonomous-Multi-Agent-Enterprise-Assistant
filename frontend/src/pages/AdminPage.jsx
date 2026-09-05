@@ -119,36 +119,67 @@ function MetricsTable({ title, data }) {
 
 function MetricsSection() {
   const [report, setReport] = useState(null);
+  const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
 
-  useEffect(() => {
-    getMetrics().then(setReport).catch(() => setError("Could not load evaluation metrics."));
-  }, []);
+  function fetchMetrics() {
+    setLoading(true);
+    setError("");
+    getMetrics()
+      .then(setReport)
+      .catch(() => setError("Could not load evaluation metrics."))
+      .finally(() => setLoading(false));
+  }
+
+  useEffect(() => { fetchMetrics(); }, []);
+
+  function handleExport() {
+    if (!report) return;
+    const blob = new Blob([JSON.stringify(report, null, 2)], { type: "application/json" });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = `evaluation-report-${new Date().toISOString().slice(0, 10)}.json`;
+    a.click();
+    URL.revokeObjectURL(url);
+  }
 
   if (error) {
     return (
       <section className="admin-section">
         <h2>Evaluation Metrics</h2>
         <p className="error">{error}</p>
+        <button type="button" onClick={fetchMetrics}>Retry</button>
       </section>
     );
   }
-  if (!report) return null;
 
   return (
     <section className="admin-section">
-      <h2>Evaluation Metrics</h2>
-      <p className="subtask-explanation">
+      <div style={{ display: "flex", alignItems: "baseline", gap: "12px", flexWrap: "wrap" }}>
+        <h2 style={{ margin: 0 }}>Evaluation Metrics</h2>
+        <button type="button" onClick={fetchMetrics} disabled={loading} style={{ fontSize: "13px" }}>
+          {loading ? "Loading…" : "Refresh"}
+        </button>
+        {report && (
+          <button type="button" onClick={handleExport} style={{ fontSize: "13px" }}>
+            Export JSON
+          </button>
+        )}
+      </div>
+      <p className="subtask-explanation" style={{ marginTop: "8px" }}>
         Accuracy figures are confidence-based proxies (no labeled ground-truth dataset exists),
         not verified-correctness scores.
       </p>
-      <div className="metrics-grid">
-        <MetricsTable title="Accuracy" data={report.accuracy} />
-        <MetricsTable title="Timing" data={report.timing} />
-        <MetricsTable title="Security" data={report.security} />
-        <MetricsTable title="Human-in-the-Loop" data={report.hitl} />
-        <MetricsTable title="Explainability" data={report.explainability} />
-      </div>
+      {report && (
+        <div className="metrics-grid">
+          <MetricsTable title="Accuracy" data={report.accuracy} />
+          <MetricsTable title="Timing" data={report.timing} />
+          <MetricsTable title="Security" data={report.security} />
+          <MetricsTable title="Human-in-the-Loop" data={report.hitl} />
+          <MetricsTable title="Explainability" data={report.explainability} />
+        </div>
+      )}
     </section>
   );
 }

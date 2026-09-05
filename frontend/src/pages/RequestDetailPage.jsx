@@ -33,6 +33,18 @@ export default function RequestDetailPage() {
       .catch(() => setError("Could not load request."));
   }, [id]);
 
+  // Poll every 5 s while any subtask is pending approval so the requester
+  // sees the HITL-resolved state without a manual reload.
+  useEffect(() => {
+    if (!request) return;
+    const hasPending = request.subtasks?.some((s) => s.status === "pending_approval");
+    if (!hasPending) return;
+    const timer = setInterval(() => {
+      getRequest(id).then(setRequest).catch(() => {});
+    }, 5000);
+    return () => clearInterval(timer);
+  }, [id, request]);
+
   if (error) {
     return (
       <div className="requests-page">
@@ -143,6 +155,11 @@ export default function RequestDetailPage() {
                       {s.workflow_steps.map((step) => (
                         <li key={step.step}>
                           <code>{step.function}</code>
+                          {step.created_at && (
+                            <span style={{ fontSize: "11px", color: "var(--text)", marginLeft: "8px", opacity: 0.7 }}>
+                              {new Date(step.created_at).toLocaleTimeString()}
+                            </span>
+                          )}
                           {step.output && Object.keys(step.output).length > 0 && (
                             <pre className="workflow-output">{JSON.stringify(step.output, null, 2)}</pre>
                           )}
