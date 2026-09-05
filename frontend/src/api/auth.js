@@ -23,3 +23,8 @@ export async function fetchCurrentUser() {
   const { data } = await client.get("/api/auth/me");
   return data;
 }
+
+export async function demoLogin(role) {
+  const { data } = await client.post("/api/auth/demo-login", { role });
+  return data;
+}

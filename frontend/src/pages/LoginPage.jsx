@@ -1,12 +1,20 @@
 import { useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
+import { demoLogin, fetchCurrentUser } from "../api/auth";
 import { useAuth } from "../context/AuthContext";
+
+const DEMO_ROLES = [
+  { role: "admin",    label: "Admin",    desc: "Full access: users, approvals, audit, settings" },
+  { role: "hr",       label: "HR",       desc: "Requests + HR banner" },
+  { role: "employee", label: "Employee", desc: "Submit and view own requests" },
+];
 
 export default function LoginPage() {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [error, setError] = useState("");
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [demoLoading, setDemoLoading] = useState(null);
   const { login } = useAuth();
   const navigate = useNavigate();
 
@@ -24,9 +32,45 @@ export default function LoginPage() {
     }
   }
 
+  async function handleDemoLogin(role) {
+    setError("");
+    setDemoLoading(role);
+    try {
+      const { access_token } = await demoLogin(role);
+      localStorage.setItem("access_token", access_token);
+      const currentUser = await fetchCurrentUser();
+      // Refresh auth context by reloading — simplest way to set user state
+      window.location.href = "/requests";
+    } catch {
+      setError("Could not sign in to demo account.");
+      setDemoLoading(null);
+    }
+  }
+
   return (
     <div className="auth-page">
       <h1>Sign in</h1>
+
+      <div className="demo-login">
+        <p className="demo-label">Quick demo login</p>
+        <div className="demo-buttons">
+          {DEMO_ROLES.map(({ role, label, desc }) => (
+            <button
+              key={role}
+              type="button"
+              className={`demo-btn demo-btn-${role}`}
+              disabled={demoLoading !== null}
+              onClick={() => handleDemoLogin(role)}
+              title={desc}
+            >
+              {demoLoading === role ? "Signing in…" : label}
+            </button>
+          ))}
+        </div>
+      </div>
+
+      <div className="auth-divider"><span>or sign in manually</span></div>
+
       <form onSubmit={handleSubmit}>
         <label>
           Email
