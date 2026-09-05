@@ -15,7 +15,7 @@ export default function LoginPage() {
   const [error, setError] = useState("");
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [demoLoading, setDemoLoading] = useState(null);
-  const { login } = useAuth();
+  const { login, loginWithToken } = useAuth();
   const navigate = useNavigate();
 
   async function handleSubmit(event) {
@@ -37,8 +37,8 @@ export default function LoginPage() {
     setDemoLoading(role);
     try {
       const { access_token } = await demoLogin(role);
-      localStorage.setItem("access_token", access_token);
-      window.location.href = "/requests";
+      await loginWithToken(access_token);
+      navigate("/requests");
     } catch {
       setError("Could not sign in to demo account.");
       setDemoLoading(null);

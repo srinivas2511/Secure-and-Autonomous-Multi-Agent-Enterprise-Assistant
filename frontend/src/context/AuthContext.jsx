@@ -26,13 +26,19 @@ export function AuthProvider({ children }) {
     setUser(currentUser);
   }
 
+  async function loginWithToken(token) {
+    localStorage.setItem("access_token", token);
+    const currentUser = await fetchCurrentUser();
+    setUser(currentUser);
+  }
+
   function logout() {
     localStorage.removeItem("access_token");
     setUser(null);
   }
 
   return (
-    <AuthContext.Provider value={{ user, isLoading, login, logout }}>
+    <AuthContext.Provider value={{ user, isLoading, login, loginWithToken, logout }}>
       {children}
     </AuthContext.Provider>
   );
