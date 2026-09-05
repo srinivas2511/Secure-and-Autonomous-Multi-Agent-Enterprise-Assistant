@@ -19,11 +19,7 @@ class RetrievedChunk:
 
 @lru_cache(maxsize=1)
 def _get_client() -> chromadb.HttpClient:
-    return chromadb.HttpClient(
-        host=settings.chroma_host,
-        port=settings.chroma_port,
-        settings=chromadb.config.Settings(anonymized_telemetry=False),
-    )
+    return chromadb.HttpClient(host=settings.chroma_host, port=settings.chroma_port)
 
 
 def get_collection():
