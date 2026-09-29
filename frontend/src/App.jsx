@@ -4,6 +4,7 @@ import { AuthProvider } from "./context/AuthContext";
 import AdminPage from "./pages/AdminPage";
 import ApprovalsPage from "./pages/ApprovalsPage";
 import LoginPage from "./pages/LoginPage";
+import ObservabilityPage from "./pages/ObservabilityPage";
 import RegisterPage from "./pages/RegisterPage";
 import RequestDetailPage from "./pages/RequestDetailPage";
 import RequestsPage from "./pages/RequestsPage";
@@ -44,6 +45,14 @@ function App() {
           element={
             <ProtectedRoute>
               <AdminPage />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/observability"
+          element={
+            <ProtectedRoute>
+              <ObservabilityPage />
             </ProtectedRoute>
           }
         />

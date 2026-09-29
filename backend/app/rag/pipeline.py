@@ -1,6 +1,6 @@
 from dataclasses import dataclass
 
-from app.rag.llm import generate
+from app.rag.llm import LLMResult, generate
 from app.rag.vector_store import query
 from app.rbac.roles import VALID_ROLES
 
@@ -30,6 +30,10 @@ class RAGResult:
     # a restricted-tier document (not open to every role) -- an extra review
     # step for confidential-data access, distinct from a hard access denial.
     sensitive: bool = False
+    # Observability: LLM call telemetry passed through from LLMResult.
+    llm_duration_ms: int | None = None
+    input_tokens: int | None = None
+    output_tokens: int | None = None
 
 
 def _distance_to_confidence(distance: float) -> float:
@@ -72,7 +76,7 @@ def answer_with_rag(query_text: str, role: str, n_results: int = 3) -> RAGResult
     allowed_chunks = [c for c in chunks if role in c.allowed_roles]
     context = "\n\n---\n\n".join(f"[{chunk.source}]\n{chunk.text}" for chunk in allowed_chunks)
     prompt = GROUNDING_PROMPT_TEMPLATE.format(context=context, question=query_text)
-    answer = generate(prompt)
+    llm_result: LLMResult = generate(prompt)
 
     sources = list(dict.fromkeys(chunk.source for chunk in allowed_chunks))
     best = allowed_chunks[0]
@@ -83,9 +87,12 @@ def answer_with_rag(query_text: str, role: str, n_results: int = 3) -> RAGResult
     )
     sensitive = any(set(c.allowed_roles) != VALID_ROLES for c in allowed_chunks)
     return RAGResult(
-        answer=answer,
+        answer=llm_result.text,
         sources=sources,
         confidence=confidence,
         explanation=explanation,
         sensitive=sensitive,
+        llm_duration_ms=llm_result.duration_ms,
+        input_tokens=llm_result.input_tokens,
+        output_tokens=llm_result.output_tokens,
     )

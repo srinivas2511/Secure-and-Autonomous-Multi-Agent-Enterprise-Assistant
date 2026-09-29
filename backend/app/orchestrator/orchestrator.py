@@ -10,6 +10,7 @@ from app.audit.logger import log_event
 from app.hitl.gate import requires_approval
 from app.models.enterprise_request import EnterpriseRequest
 from app.models.sub_task import SubTask
+from app.models.trace_span import TraceSpan
 from app.models.workflow_execution import WorkflowExecution
 from app.orchestrator.decomposer import decompose
 from app.rbac.roles import can_use_agent
@@ -82,6 +83,20 @@ def run_orchestration(request: EnterpriseRequest, db: Session) -> EnterpriseRequ
                 subtask.explanation = DENIAL_EXPLANATION
                 audit_action = "rbac.deny"
             else:
+                # Observability: open an agent-level trace span before calling the agent.
+                span_started_at = datetime.now(timezone.utc)
+                agent_span = TraceSpan(
+                    request_id=request.id,
+                    subtask_id=subtask.id,
+                    parent_span_id=None,
+                    span_type="agent",
+                    name=subtask.agent_type,
+                    status="running",
+                    started_at=span_started_at,
+                )
+                db.add(agent_span)
+                db.flush()  # get agent_span.id without committing
+
                 try:
                     agent = get_agent(subtask.agent_type)
                     # NFR-5 (Performance): time only the agent's own work, not
@@ -108,6 +123,20 @@ def run_orchestration(request: EnterpriseRequest, db: Session) -> EnterpriseRequ
                                 output=step["output"],
                             )
                         )
+                        # Observability: one child span per workflow step.
+                        db.add(
+                            TraceSpan(
+                                request_id=request.id,
+                                subtask_id=subtask.id,
+                                parent_span_id=agent_span.id,
+                                span_type="workflow_step",
+                                name=step["function_name"],
+                                status="completed",
+                                started_at=span_started_at,
+                                ended_at=datetime.now(timezone.utc),
+                                metadata_={"step_number": i, "output": step["output"]},
+                            )
+                        )
 
                     # HITL (FR-7): sensitive or below-threshold decisions don't
                     # auto-complete -- they wait for a human approver
@@ -121,11 +150,58 @@ def run_orchestration(request: EnterpriseRequest, db: Session) -> EnterpriseRequ
                         subtask.explanation = (
                             f"{agent_result.explanation} Flagged for human review: {reason}."
                         )
+                        # Observability: HITL gate child span.
+                        db.add(
+                            TraceSpan(
+                                request_id=request.id,
+                                subtask_id=subtask.id,
+                                parent_span_id=agent_span.id,
+                                span_type="hitl_gate",
+                                name="hitl_gate",
+                                status="pending_approval",
+                                started_at=datetime.now(timezone.utc),
+                                ended_at=datetime.now(timezone.utc),
+                                metadata_={"reason": reason},
+                            )
+                        )
                     else:
                         subtask.status = "completed"
                         subtask.explanation = agent_result.explanation
                         prior_results.append(agent_result)
                     audit_action = f"{subtask.agent_type}.run"
+
+                    # Observability: close the agent span and emit LLM child span if present.
+                    span_ended_at = datetime.now(timezone.utc)
+                    agent_span.status = subtask.status
+                    agent_span.ended_at = span_ended_at
+                    agent_span.duration_ms = subtask.duration_ms
+                    agent_span.metadata_ = {
+                        "confidence": agent_result.confidence,
+                        "explanation": agent_result.explanation,
+                        "sensitive": agent_result.sensitive,
+                        "sources": agent_result.sources,
+                    }
+
+                    if agent_result.llm_duration_ms is not None:
+                        db.add(
+                            TraceSpan(
+                                request_id=request.id,
+                                subtask_id=subtask.id,
+                                parent_span_id=agent_span.id,
+                                span_type="llm_call",
+                                name="llm_generate",
+                                status="completed",
+                                started_at=span_started_at,
+                                ended_at=span_ended_at,
+                                duration_ms=agent_result.llm_duration_ms,
+                                input_tokens=agent_result.input_tokens,
+                                output_tokens=agent_result.output_tokens,
+                                metadata_={
+                                    "model": None,  # available from settings if needed
+                                },
+                            )
+                        )
+
                 except Exception as exc:  # noqa: BLE001 -- isolate one agent's failure
                     # NFR-1: never show the raw exception to the requester -- it can
                     # contain internal details (infra hostnames, file paths, etc).
@@ -142,6 +218,10 @@ def run_orchestration(request: EnterpriseRequest, db: Session) -> EnterpriseRequ
                         "This subtask failed with an unexpected error; no confidence applies."
                     )
                     audit_action = f"{subtask.agent_type}.error"
+                    # Observability: close the span as failed.
+                    agent_span.status = "failed"
+                    agent_span.ended_at = datetime.now(timezone.utc)
+                    agent_span.metadata_ = {"error": error_detail}
 
         # FR-8: log every agent action, whatever the outcome -- including
         # denials, where no agent ever ran. error_detail (admin-only, via

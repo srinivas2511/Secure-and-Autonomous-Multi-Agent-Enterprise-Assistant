@@ -16,6 +16,7 @@ from app.models.enterprise_request import EnterpriseRequest
 from app.models.rag_evaluation_run import RagEvaluationRun
 from app.models.role_permission import RolePermission
 from app.models.sub_task import SubTask
+from app.models.trace_span import TraceSpan
 from app.models.user import User
 from app.rag.evaluation import run_evaluation
 from app.rbac.roles import VALID_ROLES, get_agent_types, require_admin
@@ -29,6 +30,7 @@ from app.schemas.admin import (
 from app.schemas.metrics import EvaluationReport
 from app.schemas.rag_evaluation import RagEvaluationRunOut
 from app.schemas.trace import DecisionTraceOut, TraceRequestContext
+from app.schemas.trace_span import TraceSpanOut
 
 router = APIRouter(prefix="/api/admin", tags=["admin"])
 
@@ -363,3 +365,82 @@ def update_settings(
         except ValueError as exc:
             raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(exc)) from exc
     return get_all_settings()
+
+
+@router.get("/traces", response_model=list[TraceSpanOut])
+def list_trace_spans(
+    request_id: int,
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+) -> list[TraceSpan]:
+    """Observability: flat list of all trace spans for a request, ordered by start time."""
+    require_admin(current_user)
+    return (
+        db.query(TraceSpan)
+        .filter(TraceSpan.request_id == request_id)
+        .order_by(TraceSpan.started_at)
+        .all()
+    )
+
+
+@router.get("/traces/{request_id}/tree")
+def get_trace_tree(
+    request_id: int,
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+) -> dict:
+    """Observability: nested span tree for a request, used by the Agent Graph UI."""
+    require_admin(current_user)
+
+    req = db.query(EnterpriseRequest).filter(EnterpriseRequest.id == request_id).first()
+    if req is None:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Request not found")
+
+    spans = (
+        db.query(TraceSpan)
+        .filter(TraceSpan.request_id == request_id)
+        .order_by(TraceSpan.started_at)
+        .all()
+    )
+
+    # Build id → dict map, then nest children under parents.
+    span_map: dict[int, dict] = {}
+    for s in spans:
+        span_map[s.id] = {
+            "id": s.id,
+            "subtask_id": s.subtask_id,
+            "parent_span_id": s.parent_span_id,
+            "span_type": s.span_type,
+            "name": s.name,
+            "status": s.status,
+            "started_at": s.started_at.isoformat() if s.started_at else None,
+            "ended_at": s.ended_at.isoformat() if s.ended_at else None,
+            "duration_ms": s.duration_ms,
+            "input_tokens": s.input_tokens,
+            "output_tokens": s.output_tokens,
+            "metadata": s.metadata_,
+            "children": [],
+        }
+
+    roots: list[dict] = []
+    for span_dict in span_map.values():
+        pid = span_dict["parent_span_id"]
+        if pid is not None and pid in span_map:
+            span_map[pid]["children"].append(span_dict)
+        else:
+            roots.append(span_dict)
+
+    total_ms = None
+    if req.created_at and req.completed_at:
+        delta = req.completed_at - req.created_at
+        total_ms = round(delta.total_seconds() * 1000)
+
+    return {
+        "request_id": request_id,
+        "request_text": req.text,
+        "request_status": req.status,
+        "created_at": req.created_at.isoformat() if req.created_at else None,
+        "completed_at": req.completed_at.isoformat() if req.completed_at else None,
+        "total_duration_ms": total_ms,
+        "spans": roots,
+    }

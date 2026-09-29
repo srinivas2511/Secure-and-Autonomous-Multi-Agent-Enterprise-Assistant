@@ -64,10 +64,10 @@ class AnalyticsAgent(BaseAgent):
         # Let LLM errors propagate to the orchestrator's uniform handler (same
         # as RAGAgent) -- it logs the real error and shows a safe message to
         # the requester (NFR-1).
-        text = generate(prompt)
+        llm_result = generate(prompt)
 
         return AgentResult(
-            text=text,
+            text=llm_result.text,
             confidence=confidence,
             explanation=explanation,
             data_access_events=[
@@ -79,4 +79,7 @@ class AnalyticsAgent(BaseAgent):
                     },
                 }
             ],
+            llm_duration_ms=llm_result.duration_ms,
+            input_tokens=llm_result.input_tokens,
+            output_tokens=llm_result.output_tokens,
         )

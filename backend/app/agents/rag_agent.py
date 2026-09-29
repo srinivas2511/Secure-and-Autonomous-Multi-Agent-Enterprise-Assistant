@@ -31,4 +31,7 @@ class RAGAgent(BaseAgent):
                     "context": {"sources": result.sources, "sensitive": result.sensitive},
                 }
             ],
+            llm_duration_ms=result.llm_duration_ms,
+            input_tokens=result.input_tokens,
+            output_tokens=result.output_tokens,
         )

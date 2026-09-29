@@ -27,6 +27,11 @@ class AgentResult:
     # need an `if agent_type == "..."` branch per agent to know who touched
     # real data). Each entry is {"action": str, "context": dict}.
     data_access_events: list[dict] = field(default_factory=list)
+    # Observability: LLM call telemetry captured by agents that call generate().
+    # Populated only by RAGAgent and AnalyticsAgent; None for all others.
+    llm_duration_ms: int | None = None
+    input_tokens: int | None = None
+    output_tokens: int | None = None
 
 
 class BaseAgent(ABC):
