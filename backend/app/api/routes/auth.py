@@ -5,13 +5,13 @@ from sqlalchemy.orm import Session
 
 from app.api.deps import get_current_user, get_db
 from app.audit.logger import log_event
+from app.core.config import settings
 from app.core.security import create_access_token, hash_password, verify_password
 from app.models.user import User
 from app.rbac.roles import VALID_ROLES
 from app.schemas.token import Token
 from app.schemas.user import UserCreate, UserOut
 
-DEMO_PASSWORD = "demo1234"
 DEMO_ACCOUNTS = {
     "admin":    {"email": "admin@enterprise-demo.com",    "full_name": "Demo Admin"},
     "hr":       {"email": "hr@enterprise-demo.com",       "full_name": "Demo HR"},
@@ -34,7 +34,7 @@ def register(payload: UserCreate, db: Session = Depends(get_db)) -> User:
         full_name=payload.full_name,
     )
     db.add(user)
-    db.flush()  # assigns user.id without committing, so the audit entry below lands atomically with it
+    db.flush()
     log_event(db, event_type="auth", action="auth.register", user_id=user.id, role=user.role)
     db.commit()
     db.refresh(user)
@@ -47,9 +47,6 @@ def login(
 ) -> Token:
     user = db.query(User).filter(User.email == form_data.username).first()
     if user is None or not verify_password(form_data.password, user.hashed_password):
-        # NFR-1: the HTTP response stays identical either way -- only the
-        # (admin-only) audit context distinguishes unknown-email from
-        # bad-password, so nothing about account existence leaks to the caller.
         log_event(
             db,
             event_type="auth",
@@ -84,8 +81,7 @@ class DemoLoginRequest(BaseModel):
 
 @router.post("/demo-login", response_model=Token)
 def demo_login(payload: DemoLoginRequest, db: Session = Depends(get_db)) -> Token:
-    """Seed and instantly sign in as a demo account for a given role.
-    Creates the account on first use; idempotent thereafter."""
+    """Seed and instantly sign in as a demo account for a given role."""
     if payload.role not in VALID_ROLES:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
@@ -93,13 +89,18 @@ def demo_login(payload: DemoLoginRequest, db: Session = Depends(get_db)) -> Toke
         )
     info = DEMO_ACCOUNTS.get(payload.role)
     if info is None:
-        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="No demo account for this role.")
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST, detail="No demo account for this role."
+        )
+
+    # Demo password comes from settings, not a hardcoded constant.
+    demo_pw = settings.demo_password
 
     user = db.query(User).filter(User.email == info["email"]).first()
     if user is None:
         user = User(
             email=info["email"],
-            hashed_password=hash_password(DEMO_PASSWORD),
+            hashed_password=hash_password(demo_pw),
             full_name=info["full_name"],
             role=payload.role,
         )
@@ -113,7 +114,9 @@ def demo_login(payload: DemoLoginRequest, db: Session = Depends(get_db)) -> Toke
         db.commit()
 
     if not user.is_active:
-        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Demo account is deactivated.")
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN, detail="Demo account is deactivated."
+        )
 
     log_event(db, event_type="auth", action="auth.demo_login", user_id=user.id, role=user.role)
     db.commit()

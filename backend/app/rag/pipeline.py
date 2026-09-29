@@ -1,6 +1,6 @@
 from dataclasses import dataclass
 
-from app.rag.llm import LLMResult, generate
+from app.rag.llm import LLMResult, generate, sanitize_input
 from app.rag.vector_store import query
 from app.rbac.roles import VALID_ROLES
 
@@ -43,6 +43,7 @@ def _distance_to_confidence(distance: float) -> float:
 
 
 def answer_with_rag(query_text: str, role: str, n_results: int = 3) -> RAGResult:
+    query_text = sanitize_input(query_text)
     chunks = query(query_text, n_results=n_results)
 
     if not chunks:

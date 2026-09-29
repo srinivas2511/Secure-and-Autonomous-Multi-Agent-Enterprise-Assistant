@@ -1,4 +1,5 @@
 import { Navigate, Route, Routes } from "react-router-dom";
+import ErrorBoundary from "./components/ErrorBoundary";
 import ProtectedRoute from "./components/ProtectedRoute";
 import { AuthProvider } from "./context/AuthContext";
 import AdminPage from "./pages/AdminPage";
@@ -11,7 +12,8 @@ import RequestsPage from "./pages/RequestsPage";
 
 function App() {
   return (
-    <AuthProvider>
+    <ErrorBoundary>
+      <AuthProvider>
       <Routes>
         <Route path="/" element={<Navigate to="/requests" replace />} />
         <Route path="/login" element={<LoginPage />} />
@@ -58,6 +60,7 @@ function App() {
         />
       </Routes>
     </AuthProvider>
+    </ErrorBoundary>
   );
 }
 

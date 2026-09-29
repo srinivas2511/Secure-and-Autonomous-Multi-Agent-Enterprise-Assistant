@@ -3,11 +3,15 @@ from contextlib import asynccontextmanager
 
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
+from slowapi.errors import RateLimitExceeded
+from slowapi import _rate_limit_exceeded_handler
 
 from app.agents.registry import AGENT_REGISTRY
 from app.api.routes import admin, approvals, auth, requests
 from app.core.config import settings
 from app.core.database import Base, SessionLocal, engine
+from app.core.middleware import CorrelationIDMiddleware
+from app.core.rate_limit import limiter
 from app.hitl.gate import SENSITIVE_AGENT_TYPES
 from app.models import (  # noqa: F401 -- register models with Base
     AuditLog,
@@ -15,6 +19,8 @@ from app.models import (  # noqa: F401 -- register models with Base
     RagEvaluationRun,
     RolePermission,
     SubTask,
+    SystemSetting,
+    TraceSpan,
     User,
     WorkflowExecution,
 )
@@ -33,33 +39,28 @@ DEFAULT_JWT_SECRET = "change-me-in-production"
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    # NFR-1: a default/well-known signing key lets anyone forge a valid JWT
-    # for any user, including admin. Warn loudly rather than fail silently.
+    # Security: refuse to start with the default JWT secret in production.
     if settings.jwt_secret_key == DEFAULT_JWT_SECRET:
+        if settings.is_production:
+            raise RuntimeError(
+                "JWT_SECRET_KEY is the default placeholder. "
+                "Set a real random secret in backend/.env before deploying."
+            )
         logger.warning(
             "=" * 70
-            + "\nSECURITY WARNING: JWT_SECRET_KEY is still the default placeholder "
-            "value.\nAnyone who knows this default (it's documented in "
-            ".env.example) can forge\nvalid auth tokens for ANY user, including "
-            "admin. Set a real random secret\nin backend/.env before this is "
-            "anything but a local dev/demo instance.\n" + "=" * 70
+            + "\nSECURITY WARNING: JWT_SECRET_KEY is the default placeholder.\n"
+            "Set a real random secret in backend/.env before deploying.\n"
+            + "=" * 70
         )
 
-    # NFR-4: decomposer routing and HITL config reference agent types by
-    # string; a typo there would otherwise fail silently until a real
-    # request happened to hit it. Catch it loudly at deploy time instead.
+    # Sanity: catch decomposer/HITL typos at deploy time.
     referenced_agent_types = set(AGENT_KEYWORDS.keys())
     referenced_agent_types |= {FALLBACK_AGENT_TYPE, VALIDATION_AGENT_TYPE}
     referenced_agent_types |= set(SENSITIVE_AGENT_TYPES)
     unregistered = referenced_agent_types - set(AGENT_REGISTRY.keys())
     if unregistered:
         logger.warning(
-            "=" * 70
-            + "\nCONFIG WARNING: the following agent type(s) are referenced by "
-            "decomposer routing\nor HITL config but are NOT registered in "
-            "AGENT_REGISTRY: %s\nRequests routed to them will fail at runtime. "
-            "Check app/orchestrator/decomposer.py\nand app/hitl/gate.py "
-            "against app/agents/registry.py.\n" + "=" * 70,
+            "CONFIG WARNING: agent type(s) referenced but not registered: %s",
             sorted(unregistered),
         )
 
@@ -78,8 +79,8 @@ async def lifespan(app: FastAPI):
         logger.info("RAG knowledge base ready: %d document(s) ingested.", count)
     except Exception:
         logger.exception(
-            "Could not ingest RAG documents on startup (is the chromadb service running?). "
-            "The app will still start; the RAG agent will report errors until this is fixed."
+            "Could not ingest RAG documents on startup (is chromadb running?). "
+            "The app will still start; RAG agent will error until this is fixed."
         )
 
     yield
@@ -87,12 +88,21 @@ async def lifespan(app: FastAPI):
 
 app = FastAPI(title="Secure Autonomous Multi-Agent Enterprise Assistant", lifespan=lifespan)
 
+# ── Rate limiting ─────────────────────────────────────────────────────────────
+app.state.limiter = limiter
+app.add_exception_handler(RateLimitExceeded, _rate_limit_exceeded_handler)
+
+# ── Correlation IDs ──────────────────────────────────────────────────────────
+app.add_middleware(CorrelationIDMiddleware)
+
+# ── CORS — specific methods/headers, not wildcard ────────────────────────────
 app.add_middleware(
     CORSMiddleware,
     allow_origins=settings.cors_origin_list,
     allow_credentials=True,
-    allow_methods=["*"],
-    allow_headers=["*"],
+    allow_methods=["GET", "POST", "PATCH", "DELETE", "OPTIONS"],
+    allow_headers=["Authorization", "Content-Type", "X-Request-ID"],
+    expose_headers=["X-Request-ID"],
 )
 
 app.include_router(auth.router)
@@ -102,5 +112,22 @@ app.include_router(admin.router)
 
 
 @app.get("/api/health")
-def health_check() -> dict[str, str]:
-    return {"status": "ok"}
+def health_check() -> dict:
+    """Shallow liveness probe — checks DB and LLM connectivity."""
+    from app.rag.llm import ollama_available
+
+    db_ok = False
+    try:
+        import sqlalchemy
+        _db = SessionLocal()
+        _db.execute(sqlalchemy.text("SELECT 1"))
+        _db.close()
+        db_ok = True
+    except Exception:
+        pass
+
+    return {
+        "status": "ok" if db_ok else "degraded",
+        "database": "ok" if db_ok else "unavailable",
+        "llm": "ok" if ollama_available() else "unavailable",
+    }

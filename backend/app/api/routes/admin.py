@@ -3,7 +3,7 @@ from datetime import datetime
 
 from fastapi import APIRouter, Depends, HTTPException, Query, status
 from pydantic import BaseModel, ConfigDict
-from sqlalchemy.orm import Session
+from sqlalchemy.orm import Session, joinedload
 
 from app.agents.registry import AGENT_REGISTRY
 from app.api.deps import get_current_user, get_db
@@ -65,15 +65,19 @@ def _build_matrix(db: Session) -> PermissionsMatrixOut:
 
 @router.get("/requests", response_model=list[AdminRequestOut])
 def list_all_requests(
+    skip: int = 0,
+    limit: int = Query(default=50, le=200, ge=1),
     current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db),
 ) -> list[AdminRequestOut]:
-    """Admin view: all requests across all users, newest first."""
+    """Admin view: all requests across all users, newest first (paginated)."""
     require_admin(current_user)
     rows = (
         db.query(EnterpriseRequest)
+        .options(joinedload(EnterpriseRequest.user), joinedload(EnterpriseRequest.subtasks))
         .order_by(EnterpriseRequest.created_at.desc())
-        .limit(200)
+        .offset(skip)
+        .limit(limit)
         .all()
     )
     return [
@@ -312,10 +316,7 @@ def get_system_health(
     permission_count = db.query(RolePermission).count()
 
     agents = [
-        {
-            "type": agent_type,
-            "sensitive": agent_type in SENSITIVE_AGENT_TYPES,
-        }
+        {"type": agent_type, "sensitive": agent_type in SENSITIVE_AGENT_TYPES}
         for agent_type in sorted(AGENT_REGISTRY.keys())
     ]
 
@@ -328,6 +329,18 @@ def get_system_health(
         doc_count = 0
         rag_status = str(exc)
 
+    from app.rag.llm import ollama_available
+    ollama_status = "ok" if ollama_available() else "unavailable"
+
+    pending_approvals = db.query(EnterpriseRequest).filter(
+        EnterpriseRequest.status == "pending_approval"
+    ).count()
+
+    from app.models.sub_task import SubTask
+    processing_requests = db.query(EnterpriseRequest).filter(
+        EnterpriseRequest.status == "processing"
+    ).count()
+
     return {
         "db": {
             "status": "ok",
@@ -337,6 +350,11 @@ def get_system_health(
         },
         "agents": agents,
         "rag": {"status": rag_status, "document_count": doc_count},
+        "llm": {"status": ollama_status},
+        "queue": {
+            "processing": processing_requests,
+            "pending_approvals": pending_approvals,
+        },
         "hitl_confidence_threshold": get_hitl_threshold(),
     }
 

@@ -22,6 +22,52 @@ services:
     volumes:
       - chroma_data:/chroma/chroma
 
+  ollama:
+    image: ollama/ollama:latest
+    ports:
+      - "11434:11434"
+    volumes:
+      - ollama_data:/root/.ollama
+    # Pull the model on first start. Remove if you pull manually.
+    entrypoint: >
+      sh -c "ollama serve &
+             sleep 5 &&
+             ollama pull llama3.2 &&
+             wait"
+
+  backend:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    environment:
+      DATABASE_URL: postgresql+psycopg://enterprise:enterprise@postgres:5432/enterprise_assistant
+      CHROMA_HOST: chromadb
+      CHROMA_PORT: 8000
+      OLLAMA_BASE_URL: http://ollama:11434
+      ENVIRONMENT: production
+      # Set a real secret here or via .env before deploying:
+      JWT_SECRET_KEY: ${JWT_SECRET_KEY:-change-me-in-production}
+      CORS_ORIGINS: http://localhost,http://localhost:80
+    depends_on:
+      postgres:
+        condition: service_healthy
+      chromadb:
+        condition: service_started
+    expose:
+      - "8123"
+
+  nginx:
+    image: nginx:alpine
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - ./nginx/nginx.conf:/etc/nginx/nginx.conf:ro
+      - ./nginx/certs:/etc/nginx/certs:ro
+    depends_on:
+      - backend
+
 volumes:
   postgres_data:
   chroma_data:
+  ollama_data:

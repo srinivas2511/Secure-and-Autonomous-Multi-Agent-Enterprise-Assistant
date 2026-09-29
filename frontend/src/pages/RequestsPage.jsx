@@ -1,6 +1,6 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
-import { createRequest, listRequests } from "../api/requests";
+import { createRequest, listRequests, streamRequest } from "../api/requests";
 import { useAuth } from "../context/AuthContext";
 import NavBar from "../components/NavBar";
 import { humanizeAgent, humanizeStatus } from "../utils/labels";
@@ -18,11 +18,16 @@ export default function RequestsPage() {
   const [requests, setRequests] = useState([]);
   const [text, setText] = useState("");
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [streamingId, setStreamingId] = useState(null);
   const [error, setError] = useState("");
+  const streamCleanupRef = useRef(null);
 
   useEffect(() => {
     listRequests().then(setRequests).catch(() => setError("Could not load requests."));
   }, []);
+
+  // Cleanup SSE stream on unmount
+  useEffect(() => () => streamCleanupRef.current?.(), []);
 
   // Auto-poll every 5 s while any subtask is pending_approval so the requester
   // sees status updates without a manual reload.
@@ -42,6 +47,25 @@ export default function RequestsPage() {
     return () => clearInterval(timer);
   }, [requests]);
 
+  function attachStream(requestId) {
+    streamCleanupRef.current?.();
+    setStreamingId(requestId);
+    const cleanup = streamRequest(
+      requestId,
+      (payload) => {
+        setRequests((prev) =>
+          prev.map((r) => (r.id === requestId ? { ...r, ...payload } : r))
+        );
+        const terminal = ["completed", "failed", "approved", "rejected"];
+        if (terminal.includes(payload.status)) {
+          setStreamingId(null);
+        }
+      },
+      () => setStreamingId(null)
+    );
+    streamCleanupRef.current = cleanup;
+  }
+
   async function handleSubmit(event) {
     event.preventDefault();
     if (!text.trim()) return;
@@ -51,6 +75,7 @@ export default function RequestsPage() {
       const created = await createRequest(text);
       setRequests((prev) => [created, ...prev]);
       setText("");
+      attachStream(created.id);
     } catch {
       setError("Could not submit your request.");
     } finally {
@@ -86,6 +111,11 @@ export default function RequestsPage() {
             <li key={r.id}>
               <p className="request-text">{r.text}</p>
               <span className={`status status-${r.status}`}>{humanizeStatus(r.status)}</span>
+              {streamingId === r.id && (
+                <span style={{ fontSize: "0.78rem", color: "#7c5cbf", marginLeft: "0.5rem" }}>
+                  ⏳ Processing…
+                </span>
+              )}
               <span className="request-time">
                 {new Date(r.created_at).toLocaleString()}
               </span>
