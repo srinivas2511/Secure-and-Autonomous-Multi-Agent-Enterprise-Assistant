@@ -401,6 +401,102 @@ def list_trace_spans(
     )
 
 
+@router.get("/analytics")
+def get_analytics(
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+) -> dict:
+    """Aggregated analytics for the dashboard."""
+    require_admin(current_user)
+
+    from collections import Counter, defaultdict
+    from datetime import date, timedelta
+    from app.models.sub_task import SubTask
+    from app.workflow.functions import MOCK_HEADCOUNT, MOCK_EXPENSE_TOTALS_USD
+
+    # ── Request volume — last 30 days ────────────────────────────────────────
+    today = date.today()
+    thirty_days_ago = today - timedelta(days=29)
+    all_requests = db.query(EnterpriseRequest).filter(
+        EnterpriseRequest.created_at >= thirty_days_ago
+    ).all()
+
+    daily: dict[str, int] = {}
+    for i in range(30):
+        daily[(today - timedelta(days=29 - i)).isoformat()] = 0
+    for r in all_requests:
+        key = r.created_at.date().isoformat()
+        if key in daily:
+            daily[key] += 1
+    requests_by_day = [{"date": k, "count": v} for k, v in daily.items()]
+
+    # ── Request status breakdown ─────────────────────────────────────────────
+    status_counts = Counter(
+        r.status for r in db.query(EnterpriseRequest).all()
+    )
+
+    # ── Subtask stats by agent ────────────────────────────────────────────────
+    all_subtasks = db.query(SubTask).all()
+    agent_counts: Counter = Counter()
+    agent_durations: dict[str, list[int]] = defaultdict(list)
+    agent_confidence: dict[str, list[float]] = defaultdict(list)
+    hitl_count = 0
+    denial_count = 0
+    confidence_bins = [0] * 5  # 0-20, 20-40, 40-60, 60-80, 80-100
+
+    for st in all_subtasks:
+        agent_counts[st.agent_type] += 1
+        if st.duration_ms is not None:
+            agent_durations[st.agent_type].append(st.duration_ms)
+        if st.confidence is not None:
+            agent_confidence[st.agent_type].append(st.confidence)
+            bucket = min(int(st.confidence * 5), 4)
+            confidence_bins[bucket] += 1
+        if st.status == "pending_approval":
+            hitl_count += 1
+        if st.status in ("denied", "rejected"):
+            denial_count += 1
+
+    subtasks_by_agent = [{"agent": k, "count": v} for k, v in sorted(agent_counts.items())]
+    avg_duration_by_agent = [
+        {"agent": k, "avg_ms": round(sum(v) / len(v))}
+        for k, v in agent_durations.items() if v
+    ]
+    avg_confidence_by_agent = [
+        {"agent": k, "avg_pct": round(sum(v) / len(v) * 100)}
+        for k, v in agent_confidence.items() if v
+    ]
+
+    # ── Top requesters ────────────────────────────────────────────────────────
+    user_counts: Counter = Counter(r.user_id for r in db.query(EnterpriseRequest).all())
+    user_map = {u.id: u.email for u in db.query(User).all()}
+    top_requesters = [
+        {"email": user_map.get(uid, "unknown"), "count": cnt}
+        for uid, cnt in user_counts.most_common(5)
+    ]
+
+    return {
+        "requests_by_day": requests_by_day,
+        "requests_by_status": dict(status_counts),
+        "subtasks_by_agent": subtasks_by_agent,
+        "avg_duration_by_agent": avg_duration_by_agent,
+        "avg_confidence_by_agent": avg_confidence_by_agent,
+        "confidence_bins": [
+            {"range": f"{i*20}–{i*20+20}%", "count": confidence_bins[i]}
+            for i in range(5)
+        ],
+        "hitl_escalations": hitl_count,
+        "denial_count": denial_count,
+        "total_requests": db.query(EnterpriseRequest).count(),
+        "total_subtasks": len(all_subtasks),
+        "top_requesters": top_requesters,
+        "enterprise": {
+            "headcount": [{"dept": k, "count": v} for k, v in MOCK_HEADCOUNT.items()],
+            "expenses": [{"dept": k, "usd": v} for k, v in MOCK_EXPENSE_TOTALS_USD.items()],
+        },
+    }
+
+
 @router.get("/traces/{request_id}/tree")
 def get_trace_tree(
     request_id: int,
