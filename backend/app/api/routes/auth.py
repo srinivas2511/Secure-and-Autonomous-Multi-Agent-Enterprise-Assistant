@@ -7,6 +7,7 @@ from app.api.deps import get_current_user, get_db
 from app.audit.logger import log_event
 from app.core.config import settings
 from app.core.security import create_access_token, hash_password, verify_password
+from app.models.role_permission import RolePermission
 from app.models.user import User
 from app.rbac.roles import VALID_ROLES
 from app.schemas.token import Token
@@ -73,6 +74,16 @@ def login(
 @router.get("/me", response_model=UserOut)
 def read_current_user(current_user: User = Depends(get_current_user)) -> User:
     return current_user
+
+
+@router.get("/my-permissions", response_model=list[str])
+def my_permissions(
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+) -> list[str]:
+    """Return the agent_types the current user's role is allowed to use."""
+    rows = db.query(RolePermission).filter_by(role=current_user.role).all()
+    return [r.agent_type for r in rows]
 
 
 class DemoLoginRequest(BaseModel):

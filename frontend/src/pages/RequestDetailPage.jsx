@@ -4,6 +4,7 @@ import { getRequest } from "../api/requests";
 import { useAuth } from "../context/AuthContext";
 import NavBar from "../components/NavBar";
 import { humanizeAgent, humanizeStatus } from "../utils/labels";
+import { AGENT_COLORS, AGENT_ICONS } from "../utils/agents";
 
 function confidenceTier(confidence) {
   if (confidence == null) return null;
@@ -105,11 +106,18 @@ export default function RequestDetailPage() {
             {request.subtasks.map((s) => (
               <div
                 key={s.id}
-                style={{ marginBottom: "1.5rem", borderLeft: "3px solid #444", paddingLeft: "1rem" }}
+                style={{
+                  marginBottom: "1.5rem",
+                  borderLeft: `3px solid ${AGENT_COLORS[s.agent_type] ?? "#444"}`,
+                  paddingLeft: "1rem",
+                }}
               >
                 <div style={{ display: "flex", gap: "0.75rem", alignItems: "center", flexWrap: "wrap", marginBottom: "0.4rem" }}>
                   <span className="subtask-id-badge">#{s.id}</span>
-                  <strong>{humanizeAgent(s.agent_type)}</strong>
+                  <strong>
+                    {AGENT_ICONS[s.agent_type] && <span aria-hidden="true" style={{ marginRight: "4px" }}>{AGENT_ICONS[s.agent_type]}</span>}
+                    {humanizeAgent(s.agent_type)}
+                  </strong>
                   <span className={`status status-${s.status}`}>{humanizeStatus(s.status)}</span>
                   {s.confidence != null && (
                     <span className={`confidence confidence-${confidenceTier(s.confidence)}`}>

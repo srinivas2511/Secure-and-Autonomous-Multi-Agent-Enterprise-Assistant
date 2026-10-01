@@ -1,5 +1,10 @@
 import client from "./client";
 
+export async function getAnalytics() {
+  const { data } = await client.get("/api/admin/analytics");
+  return data;
+}
+
 export async function listUsers() {
   const { data } = await client.get("/api/admin/users");
   return data;

@@ -61,6 +61,8 @@ def _keyword_decompose(text: str) -> list[SubTaskPlan]:
     ]
     if not matched:
         matched = [FALLBACK_AGENT_TYPE]
+    if "security" not in matched:
+        matched.append("security")
     plans = [SubTaskPlan(agent_type=t, description=text) for t in matched]
     plans.append(SubTaskPlan(agent_type=VALIDATION_AGENT_TYPE, description=text))
     return plans
@@ -90,6 +92,13 @@ def _llm_decompose(text: str) -> list[SubTaskPlan]:
         if not agent_type:
             continue
         plans.append(SubTaskPlan(agent_type=agent_type, description=description or text))
+
+    # Always include a security check on every request
+    if not any(p.agent_type == "security" for p in plans):
+        plans.insert(
+            max(0, len(plans) - 1),  # before validation if it's already there
+            SubTaskPlan(agent_type="security", description=f"Security policy check for: {text}"),
+        )
 
     # Guarantee a validation subtask exists (LLM might omit it)
     if not any(p.agent_type == VALIDATION_AGENT_TYPE for p in plans):

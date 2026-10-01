@@ -28,3 +28,8 @@ export async function demoLogin(role) {
   const { data } = await client.post("/api/auth/demo-login", { role });
   return data;
 }
+
+export async function fetchMyPermissions() {
+  const { data } = await client.get("/api/auth/my-permissions");
+  return data;
+}

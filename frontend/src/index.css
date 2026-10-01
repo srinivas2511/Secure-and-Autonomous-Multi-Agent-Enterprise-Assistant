@@ -339,7 +339,15 @@ textarea {
   background: var(--code-bg);
   border-radius: 6px;
   padding: 10px 12px;
+  border-left: 3px solid var(--border);
 }
+
+/* Per-agent accent colours */
+.subtask-list li[data-agent="rag"]        { border-left-color: #6366f1; }
+.subtask-list li[data-agent="security"]   { border-left-color: #ef4444; }
+.subtask-list li[data-agent="analytics"]  { border-left-color: #f59e0b; }
+.subtask-list li[data-agent="workflow"]   { border-left-color: #22c55e; }
+.subtask-list li[data-agent="validation"] { border-left-color: #3b82f6; }
 
 .subtask-agent {
   font-size: 12px;
@@ -348,6 +356,9 @@ textarea {
   letter-spacing: 0.5px;
   color: var(--text-h);
   min-width: 70px;
+  display: flex;
+  align-items: center;
+  gap: 4px;
 }
 
 .subtask-result {
@@ -357,6 +368,18 @@ textarea {
   line-height: 1.5;
   color: var(--text);
   white-space: pre-line;
+}
+
+.subtask-result-toggle {
+  flex-basis: 100%;
+  background: none;
+  border: none;
+  padding: 0;
+  font-size: 12px;
+  color: var(--accent);
+  cursor: pointer;
+  text-align: left;
+  margin-top: 2px;
 }
 
 .subtask-explanation {
@@ -789,3 +812,145 @@ textarea {
   white-space: nowrap;
 }
 
+/* ── Analytics dashboard ──────────────────────────────────────────────────── */
+
+/* wider content column for the dashboard */
+.analytics-page.page-content {
+  max-width: 1040px;
+}
+
+.analytics-header {
+  display: flex;
+  align-items: baseline;
+  gap: 16px;
+  margin-bottom: 24px;
+}
+
+.analytics-header h1 {
+  font-size: 28px;
+  font-weight: 600;
+  letter-spacing: -0.5px;
+  margin: 0;
+  color: var(--text-h);
+}
+
+.analytics-refresh {
+  font-size: 13px;
+  padding: 4px 12px;
+}
+
+/* KPI stat tiles */
+.analytics-stats-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+  margin-bottom: 8px;
+}
+
+.analytics-stat {
+  flex: 1 1 140px;
+  background: var(--code-bg);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 14px 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+}
+
+.analytics-stat-value {
+  font-size: 28px;
+  font-weight: 700;
+  color: var(--text-h);
+  line-height: 1;
+  font-variant-numeric: tabular-nums;
+}
+
+.analytics-stat-label {
+  font-size: 12px;
+  font-weight: 500;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: var(--text);
+}
+
+.analytics-stat-sub {
+  font-size: 11px;
+  color: var(--text);
+  opacity: 0.75;
+}
+
+/* Section */
+.analytics-section {
+  margin-top: 28px;
+}
+
+.analytics-section-title {
+  font-size: 14px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--text);
+  margin: 0 0 10px;
+}
+
+/* Two-column layout */
+.analytics-two-col {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 24px;
+  margin-top: 28px;
+}
+
+@media (max-width: 720px) {
+  .analytics-two-col {
+    grid-template-columns: 1fr;
+  }
+}
+
+/* Chart wrappers */
+.chart-container {
+  background: var(--code-bg);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 12px 8px 4px;
+}
+
+.chart-container--short {
+  /* used in two-col context; height is set on ResponsiveContainer */
+}
+
+/* Recharts tooltip */
+.chart-tooltip {
+  background: var(--bg);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  padding: 8px 12px;
+  font-size: 13px;
+  color: var(--text-h);
+  box-shadow: 0 2px 8px rgba(0,0,0,0.12);
+}
+
+.chart-tooltip-label {
+  font-weight: 600;
+  margin-bottom: 4px;
+  color: var(--text);
+}
+
+/* CSS custom properties for chart colors (theme-aware) */
+:root {
+  --chart-grid: rgba(0,0,0,0.07);
+  --chart-label: #9ca3af;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root {
+    --chart-grid: rgba(255,255,255,0.07);
+    --chart-label: #6b7280;
+  }
+}
+
+.analytics-table td,
+.analytics-table th {
+  white-space: normal;
+}

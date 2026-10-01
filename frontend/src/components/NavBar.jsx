@@ -33,6 +33,7 @@ export default function NavBar() {
           </NavLink>
         )}
         {user.role === "admin" && <NavLink to="/admin">Admin</NavLink>}
+        {user.role === "admin" && <NavLink to="/analytics">Analytics</NavLink>}
         {user.role === "admin" && <NavLink to="/observability">Observability</NavLink>}
       </nav>
       <div className="navbar-user">
